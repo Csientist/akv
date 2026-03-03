@@ -1,0 +1,30 @@
+name: akv
+description: "A new Flutter project."
+publish_to: 'none'
+version: 0.1.0+1
+
+environment:
+  sdk: ^3.11.0
+
+dependencies:
+  flutter:
+    sdk: flutter
+  appwrite: ^12.0.0
+  sqflite: ^2.3.0
+  path: ^1.9.0              # Required by sqflite
+  connectivity_plus: ^6.0.0
+  uuid: ^4.0.0
+  workmanager: ^0.5.2
+  sqflite_common_ffi: ^2.3.5
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true
+
+dependency_overrides:
+  flutter_web_auth_2: ^4.1.0
+  workmanager: ^0.6.0
