@@ -1,18 +1,13 @@
 import 'package:sqflite/sqflite.dart';
 import 'package:uuid/uuid.dart';
 import '../../core/local_db.dart';
-import '../models/ledger_entry.dart'; // Make sure this file contains Asset, InventoryItem, and Financial too
-import '../../services/sync_service.dart';
+import '../models/ledger_entry.dart';
 
 const _uuid = Uuid();
 
 class LedgerRepository {
   final LocalDb _db;
-  final SyncService _sync;
-
-  LedgerRepository({LocalDb? db, SyncService? sync}) 
-      : _db = db ?? LocalDb.instance,
-        _sync = sync ?? SyncService();
+  LedgerRepository({LocalDb? db}) : _db = db ?? LocalDb.instance;
 
   // ── Record a Sale ──────────────────────────────────────────────────────────
   Future<LedgerEntry> recordSale({
@@ -23,28 +18,20 @@ class LedgerRepository {
   }) async {
     final entry = LedgerEntry(
       eventId: _uuid.v4(),
-      type: LedgerType.SALE, // Fixed enum casing
+      type: LedgerType.SALE,
       sourceId: sourceId,
       amount: amount,
       status: LedgerStatus.pending,
       metadata: metadata,
-      createdAt: DateTime.now().toUtc(), // Passed as DateTime, model handles String conversion
+      createdAt: DateTime.now(),
     );
-
-    final database = await _db.database;
-
-    await database.transaction((txn) async {
-      // 1. Write the Ledger Entry
+    final db = await _db.database;
+    await db.transaction((txn) async {
       await txn.insert('ledger_entries', entry.toMap());
-      // 2. Write the Financial record
-      await txn.insert('financials', financial.toMap());
-      
-      // 3. Queue BOTH for Sync
+      await txn.insert('financials', financial.copyWith(eventId: entry.eventId).toMap());
       await _db.addToQueue(txn, recordId: entry.eventId, tableName: 'ledger_entries');
       await _db.addToQueue(txn, recordId: financial.transactionId, tableName: 'financials');
     });
-
-    _sync.processQueue(); // Trigger background sync
     return entry;
   }
 
@@ -57,117 +44,78 @@ class LedgerRepository {
   }) async {
     final entry = LedgerEntry(
       eventId: _uuid.v4(),
-      type: LedgerType.PURCHASE, // Fixed enum casing
+      type: LedgerType.PURCHASE,
       sourceId: sourceId,
       amount: amount,
+      status: LedgerStatus.pending,
       metadata: metadata,
-      createdAt: DateTime.now().toUtc(),
+      createdAt: DateTime.now(),
     );
-
-    final database = await _db.database;
-    await database.transaction((txn) async {
+    final db = await _db.database;
+    await db.transaction((txn) async {
       await txn.insert('ledger_entries', entry.toMap());
-      await txn.insert('financials', financial.toMap());
-      
-      // Queue both records
+      await txn.insert('financials', financial.copyWith(eventId: entry.eventId).toMap());
       await _db.addToQueue(txn, recordId: entry.eventId, tableName: 'ledger_entries');
       await _db.addToQueue(txn, recordId: financial.transactionId, tableName: 'financials');
     });
-
-    _sync.processQueue();
     return entry;
   }
 
-  // ── Save/Update an Asset (Herd or Crop) ────────────────────────────────────
+  // ── Save / Update Asset ────────────────────────────────────────────────────
   Future<Asset> saveAsset(Asset asset) async {
-    final database = await _db.database;
-    
-    // Create audit log for the asset change
+    final db = await _db.database;
     final ledgerEntry = LedgerEntry(
       eventId: _uuid.v4(),
-      type: LedgerType.HERD_UPDATE, // Fixed enum casing
+      type: LedgerType.HERD_UPDATE,
       sourceId: asset.assetId,
-      createdAt: DateTime.now().toUtc(),
+      createdAt: DateTime.now(),
     );
-
-    final updatedAsset = Asset(
-      assetId: asset.assetId,
-      category: asset.category,
-      breedType: asset.breedType,
-      status: asset.status,
-      lastEventId: ledgerEntry.eventId,
-      createdAt: asset.createdAt, // Removed ?? _now (createdAt is non-nullable)
-    );
-
-    await database.transaction((txn) async {
-      // Write Ledger Log
+    final updated = asset.copyWith(lastEventId: ledgerEntry.eventId);
+    await db.transaction((txn) async {
       await txn.insert('ledger_entries', ledgerEntry.toMap());
-      // Upsert Asset
-      await txn.insert(
-        'assets',
-        updatedAsset.toMap(),
-        conflictAlgorithm: ConflictAlgorithm.replace,
-      );
-      
-      // Sync both the Cow/Crop and the Log entry
-      await _db.addToQueue(txn, recordId: ledgerEntry.eventId, tableName: 'ledger_entries');
-      await _db.addToQueue(txn, recordId: updatedAsset.assetId, tableName: 'assets');
+      await txn.insert('assets', updated.toMap(), conflictAlgorithm: ConflictAlgorithm.replace);
+      await _db.addToQueue(txn, recordId: asset.assetId, tableName: 'assets');
     });
-
-    _sync.processQueue();
-    return updatedAsset;
+    return updated;
   }
 
-  // ── Adjust Inventory (Consumption or Restock) ──────────────────────────────
+  // ── Adjust Inventory ───────────────────────────────────────────────────────
   Future<InventoryItem> adjustInventory({
     required InventoryItem item,
-    required double delta, 
+    required double delta,
   }) async {
-    final database = await _db.database;
-
-    final updated = InventoryItem(
-      itemId: item.itemId,
-      itemName: item.itemName,
-      quantity: (item.quantity + delta).clamp(0, double.infinity),
-      unit: item.unit,
-      reorderLevel: item.reorderLevel,
-      createdAt: item.createdAt, // Removed ?? _now
-    );
-
+    final db = await _db.database;
+    final updated = item.copyWith(quantity: (item.quantity + delta).clamp(0, double.infinity));
     final ledgerEntry = LedgerEntry(
       eventId: _uuid.v4(),
-      type: LedgerType.INVENTORY_ADJUST, // Fixed enum casing
+      type: LedgerType.INVENTORY_ADJUST,
       sourceId: item.itemId,
       amount: delta,
-      createdAt: DateTime.now().toUtc(),
+      createdAt: DateTime.now(),
     );
-
-    await database.transaction((txn) async {
+    await db.transaction((txn) async {
       await txn.insert('ledger_entries', ledgerEntry.toMap());
-      await txn.insert(
-        'inventory',
-        updated.toMap(),
-        conflictAlgorithm: ConflictAlgorithm.replace,
-      );
-      
-      // Sync the new quantity and the adjustment log
-      await _db.addToQueue(txn, recordId: ledgerEntry.eventId, tableName: 'ledger_entries');
-      await _db.addToQueue(txn, recordId: updated.itemId, tableName: 'inventory');
+      await txn.insert('inventory', updated.toMap(), conflictAlgorithm: ConflictAlgorithm.replace);
+      await _db.addToQueue(txn, recordId: item.itemId, tableName: 'inventory');
     });
-
-    _sync.processQueue();
     return updated;
+  }
+
+  // ── Add New Inventory Item ─────────────────────────────────────────────────
+  Future<InventoryItem> addInventoryItem(InventoryItem item) async {
+    final db = await _db.database;
+    await db.transaction((txn) async {
+      await txn.insert('inventory', item.toMap());
+      await _db.addToQueue(txn, recordId: item.itemId, tableName: 'inventory');
+    });
+    return item;
   }
 
   // ── Queries ────────────────────────────────────────────────────────────────
 
   Future<List<LedgerEntry>> getRecentLedger({int limit = 50}) async {
     final db = await _db.database;
-    final rows = await db.query(
-      'ledger_entries',
-      orderBy: 'created_at DESC',
-      limit: limit,
-    );
+    final rows = await db.query('ledger_entries', orderBy: 'created_at DESC', limit: limit);
     return rows.map(LedgerEntry.fromMap).toList();
   }
 
@@ -175,10 +123,17 @@ class LedgerRepository {
     final db = await _db.database;
     final rows = await db.query(
       'assets',
-      where: "category = ? AND status != 'SOLD' AND status != 'DECEASED'",
+      where: "category = ? AND status = 'ACTIVE'",
       whereArgs: [category.name],
+      orderBy: 'tag_name ASC',
     );
     return rows.map(Asset.fromMap).toList();
+  }
+
+  Future<List<InventoryItem>> getAllInventory() async {
+    final db = await _db.database;
+    final rows = await db.query('inventory', orderBy: 'category ASC, item_name ASC');
+    return rows.map(InventoryItem.fromMap).toList();
   }
 
   Future<List<InventoryItem>> getLowStockItems() async {
@@ -189,13 +144,175 @@ class LedgerRepository {
     return rows.map(InventoryItem.fromMap).toList();
   }
 
-  Future<List<Financial>> getUncertifiedTransactions() async {
+  Future<List<Financial>> getRecentFinancials({int limit = 50}) async {
     final db = await _db.database;
-    final rows = await db.query(
-      'financials',
-      where: 'is_kra_certified = 0',
-      orderBy: 'created_at DESC',
-    );
+    final rows = await db.query('financials', orderBy: 'created_at DESC', limit: limit);
     return rows.map(Financial.fromMap).toList();
   }
+
+  Future<List<Financial>> getUncertifiedTransactions() async {
+    final db = await _db.database;
+    final rows = await db.query('financials', where: 'is_kra_certified = 0', orderBy: 'created_at DESC');
+    return rows.map(Financial.fromMap).toList();
+  }
+
+  // ── Asset Editing ──────────────────────────────────────────────────────────
+  Future<void> updateAsset(Asset asset) async {
+    final db = await _db.database;
+    await db.transaction((txn) async {
+      await txn.update('assets', asset.toMap(), where: 'asset_id = ?', whereArgs: [asset.assetId]);
+      await _db.addToQueue(txn, recordId: asset.assetId, tableName: 'assets', operation: 'UPDATE');
+    });
+  }
+
+  // ── Asset Events ───────────────────────────────────────────────────────────
+  Future<AssetEvent> saveAssetEvent(AssetEvent event) async {
+    final db = await _db.database;
+    await db.transaction((txn) async {
+      await txn.insert('asset_events', event.toMap());
+      await _db.addToQueue(txn, recordId: event.eventId, tableName: 'asset_events');
+
+      // If this is a weight check, update the asset's weight_kg
+      if (event.eventType == 'weightCheck' && event.metadata?['weight_kg'] != null) {
+        await txn.execute(
+          'UPDATE assets SET weight_kg = ? WHERE asset_id = ?',
+          [event.metadata!['weight_kg'], event.assetId],
+        );
+      }
+
+      // If sold or deceased, update asset status
+      if (event.eventType == 'sold' || event.eventType == 'deceased') {
+        final newStatus = event.eventType == 'sold' ? 'SOLD' : 'DECEASED';
+        await txn.execute(
+          'UPDATE assets SET status = ? WHERE asset_id = ?',
+          [newStatus, event.assetId],
+        );
+      }
+    });
+    return event;
+  }
+
+  Future<List<AssetEvent>> getEventsForAsset(String assetId) async {
+    final db = await _db.database;
+    final rows = await db.query(
+      'asset_events',
+      where: 'asset_id = ?',
+      whereArgs: [assetId],
+      orderBy: 'recorded_at DESC',
+    );
+    return rows.map(AssetEvent.fromMap).toList();
+  }
+
+  // ── Milk Logs ──────────────────────────────────────────────────────────────
+  Future<MilkLog> saveMilkLog(MilkLog log) async {
+    final db = await _db.database;
+    await db.transaction((txn) async {
+      await txn.insert('milk_logs', log.toMap());
+      await _db.addToQueue(txn, recordId: log.logId, tableName: 'milk_logs');
+    });
+    return log;
+  }
+
+  Future<List<MilkLog>> getMilkLogs({required String assetId, DateTime? from, DateTime? to}) async {
+    final db = await _db.database;
+    String where = 'asset_id = ?';
+    final args = <dynamic>[assetId];
+    if (from != null) { where += ' AND recorded_at >= ?'; args.add(from.toIso8601String()); }
+    if (to != null)   { where += ' AND recorded_at <= ?'; args.add(to.toIso8601String()); }
+    final rows = await db.query('milk_logs', where: where, whereArgs: args, orderBy: 'recorded_at DESC');
+    return rows.map(MilkLog.fromMap).toList();
+  }
+
+  Future<double> getTotalMilkForAsset(String assetId, {DateTime? from}) async {
+    final db = await _db.database;
+    String where = 'asset_id = ?';
+    final args = <dynamic>[assetId];
+    if (from != null) { where += ' AND recorded_at >= ?'; args.add(from.toIso8601String()); }
+    final result = await db.rawQuery(
+      'SELECT COALESCE(SUM(litres), 0.0) as total FROM milk_logs WHERE $where',
+      args,
+    );
+    return (result.first['total'] as num).toDouble();
+  }
+
+  // ── Dashboard Summary ──────────────────────────────────────────────────────
+  Future<DashboardSummary> getDashboardSummary() async {
+    final db = await _db.database;
+
+    // Total sales (all time)
+    final salesResult = await db.rawQuery(
+      "SELECT COALESCE(SUM(amount), 0.0) as total FROM financials WHERE transaction_type = 'SALE'",
+    );
+    final totalSales = (salesResult.first['total'] as num).toDouble();
+
+    // Total purchases (all time)
+    final purchasesResult = await db.rawQuery(
+      "SELECT COALESCE(SUM(amount), 0.0) as total FROM financials WHERE transaction_type = 'PURCHASE'",
+    );
+    final totalPurchases = (purchasesResult.first['total'] as num).toDouble();
+
+    // Sales this month
+    final now = DateTime.now();
+    final monthStart = DateTime(now.year, now.month, 1).toIso8601String();
+    final salesMonthResult = await db.rawQuery(
+      "SELECT COALESCE(SUM(amount), 0.0) as total FROM financials WHERE transaction_type = 'SALE' AND created_at >= ?",
+      [monthStart],
+    );
+    final totalSalesThisMonth = (salesMonthResult.first['total'] as num).toDouble();
+
+    // Livestock count
+    final livestockResult = await db.rawQuery(
+      "SELECT COUNT(*) as count FROM assets WHERE category = 'LIVESTOCK' AND status = 'ACTIVE'",
+    );
+    final livestockCount = (livestockResult.first['count'] as int);
+
+    // Crop count
+    final cropResult = await db.rawQuery(
+      "SELECT COUNT(*) as count FROM assets WHERE category = 'CROP' AND status = 'ACTIVE'",
+    );
+    final cropCount = (cropResult.first['count'] as int);
+
+    // Low stock count
+    final lowStockResult = await db.rawQuery(
+      'SELECT COUNT(*) as count FROM inventory WHERE quantity <= reorder_level',
+    );
+    final lowStockCount = (lowStockResult.first['count'] as int);
+
+    // Pending sync count
+    final syncResult = await db.rawQuery(
+      "SELECT COUNT(*) as count FROM sync_queue WHERE status = 'pending'",
+    );
+    final pendingSyncCount = (syncResult.first['count'] as int);
+
+    // Recent 5 transactions
+    final recentRows = await db.query('financials', orderBy: 'created_at DESC', limit: 5);
+    final recentTransactions = recentRows.map(Financial.fromMap).toList();
+
+    return DashboardSummary(
+      totalSalesAllTime: totalSales,
+      totalPurchasesAllTime: totalPurchases,
+      totalSalesThisMonth: totalSalesThisMonth,
+      livestockCount: livestockCount,
+      cropCount: cropCount,
+      lowStockCount: lowStockCount,
+      pendingSyncCount: pendingSyncCount,
+      recentTransactions: recentTransactions,
+    );
+  }
+}
+
+// Extension to allow setting eventId after construction
+extension FinancialCopyWith on Financial {
+  Financial copyWith({String? eventId}) => Financial(
+        transactionId: transactionId,
+        transactionType: transactionType,
+        customerSupplierName: customerSupplierName,
+        paymentMethod: paymentMethod,
+        amount: amount,
+        description: description,
+        isKraCertified: isKraCertified,
+        kraReference: kraReference,
+        eventId: eventId ?? this.eventId,
+        createdAt: createdAt,
+      );
 }

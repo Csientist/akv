@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'dart:developer' as dev;
 import 'package:connectivity_plus/connectivity_plus.dart';
 import '../core/local_db.dart';
@@ -25,7 +24,11 @@ class SyncService {
   Future<void> _runSyncLoop() async {
     // Step 1: Check connectivity (Hardened for connectivity_plus ^6.0.0)
     final connectivityResults = await Connectivity().checkConnectivity();
+
+    print('📡 Network check: $connectivityResults');
+
     if (connectivityResults.contains(ConnectivityResult.none)) {
+      print('📴 App thinks it is offline! Aborting sync.'); // ADD THIS
       dev.log('[SyncService] Offline — queue will retry when connected.');
       return;
     }
@@ -137,21 +140,13 @@ class SyncService {
     for (final entry in data.entries) {
       var val = entry.value;
 
-      // 1. Boolean Conversion (SQLite stores bools as 0 or 1 integers)
+      // 1. Boolean Conversion (SQLite stores bools as integers)
       if (entry.key == 'is_kra_certified') {
         val = (val == 1);
       } 
-      // 2. JSON Decoding (SQLite stores Maps as Strings, Appwrite needs JSON Objects)
-      else if (entry.key == 'metadata' && val is String) {
-        try {
-          val = jsonDecode(val);
-        } catch (_) {
-          dev.log('[SyncService] Warning: Failed to decode metadata JSON for Appwrite.');
-          val = {}; // Fallback to empty object rather than crashing the sync
-        }
-      }
       
-      // 3. Strip internal SQLite IDs that don't belong in Appwrite
+      // 2. Strip internal SQLite IDs that Appwrite doesn't want inside the document body
+      // We don't strip the actual Primary Keys (like asset_id) because we mapped them above!
       if (entry.key == 'id' || entry.key == 'queue_id') continue;
 
       out[entry.key] = val;

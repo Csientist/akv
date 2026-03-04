@@ -17,6 +17,7 @@ import 'features/sales/sales_record_screen.dart';
 import 'features/herd/herd_screen.dart';
 import 'features/inventory/inventory_screen.dart';
 import 'features/dashboard/dashboard_screen.dart';
+import 'features/auth/auth_gate.dart';
 
 void main() async {
   // 1. Ensure Flutter binding is ready before calling native code
@@ -73,7 +74,7 @@ class FarmApp extends StatelessWidget {
       title: 'Farm Manager',
       debugShowCheckedModeBanner: false,
       theme: _buildTheme(),
-      home: const AppShell(),
+      home: const AuthGate(child: AppShell()),
     );
   }
 
