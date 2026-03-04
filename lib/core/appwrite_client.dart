@@ -19,6 +19,8 @@ class AppwriteClient {
   static const colAssets     = 'assets';
   static const colInventory  = 'inventory';
   static const colFinancials = 'financials';
+  static const colAssetEvents = 'asset_events'; 
+  static const colMilkLogs    = 'milk_logs';      
 
   void init() {
     client = Client()
