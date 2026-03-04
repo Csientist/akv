@@ -1,7 +1,18 @@
 import 'dart:convert';
 
-enum LedgerType { SALE, PURCHASE, HERD_UPDATE, INVENTORY_ADJUST }
-enum LedgerStatus { pending, completed, failed }
+// ── Enums ─────────────────────────────────────────────────────────────────────
+
+enum LedgerType    { sale, purchase, herdUpdate, inventoryAdjust }
+enum LedgerStatus  { pending, completed, failed }
+enum AssetCategory { livestock, crop }
+enum AssetStatus   { active, SOLD, DECEASED }
+enum PaymentMethod { MPESA, CASH, BANK }
+enum PaymentStatus { PAID, PENDING, FAILED }
+enum InventoryUnit { KG, LITRES, BAGS, PIECES, VIALS }
+enum InventoryCategory { FEED, MEDICINE, EQUIPMENT, SEED, OTHER }
+enum MilkSession   { AM, PM, FULL }
+
+// ── LedgerEntry ───────────────────────────────────────────────────────────────
 
 class LedgerEntry {
   final String eventId;
@@ -10,6 +21,7 @@ class LedgerEntry {
   final double amount;
   final LedgerStatus status;
   final Map<String, dynamic>? metadata;
+  final String createdBy;
   final DateTime createdAt;
 
   const LedgerEntry({
@@ -19,42 +31,42 @@ class LedgerEntry {
     this.amount = 0.0,
     this.status = LedgerStatus.pending,
     this.metadata,
+    required this.createdBy,
     required this.createdAt,
   });
 
   Map<String, dynamic> toMap() => {
-        'event_id': eventId,
-        'type': type.name,
-        'source_id': sourceId,
-        'amount': amount,
-        'status': status.name,
-        'metadata': metadata != null ? jsonEncode(metadata) : null,
+        'event_id':   eventId,
+        'type':       type.name,
+        'source_id':  sourceId,
+        'amount':     amount,
+        'status':     status.name,
+        'metadata':   metadata != null ? jsonEncode(metadata) : null,
+        'created_by': createdBy,
         'created_at': createdAt.toIso8601String(),
       };
 
   factory LedgerEntry.fromMap(Map<String, dynamic> map) => LedgerEntry(
-        eventId: map['event_id'] as String,
-        type: LedgerType.values.byName(map['type'] as String),
-        sourceId: map['source_id'] as String,
-        amount: (map['amount'] as num?)?.toDouble() ?? 0.0,
-        status: LedgerStatus.values.byName(map['status'] as String),
-        metadata: map['metadata'] != null
+        eventId:   map['event_id'] as String,
+        type:      LedgerType.values.byName(map['type'] as String),
+        sourceId:  map['source_id'] as String,
+        amount:    (map['amount'] as num?)?.toDouble() ?? 0.0,
+        status:    LedgerStatus.values.byName(map['status'] as String),
+        metadata:  map['metadata'] != null
             ? (map['metadata'] is String
                 ? jsonDecode(map['metadata'] as String)
                 : map['metadata']) as Map<String, dynamic>
             : null,
+        createdBy: map['created_by'] as String? ?? 'UNKNOWN',
         createdAt: DateTime.parse(map['created_at'] as String).toUtc(),
       );
 }
 
-// ── Asset Model (upgraded with tag, weight, age, health notes) ─────────────
-
-enum AssetCategory { LIVESTOCK, CROP }
-enum AssetStatus { ACTIVE, SOLD, DECEASED }
+// ── Asset ─────────────────────────────────────────────────────────────────────
 
 class Asset {
   final String assetId;
-  final String tagName;       // e.g. "Daisy", "Bull-003", "Pen-A2"
+  final String tagName;
   final AssetCategory category;
   final String breedType;
   final AssetStatus status;
@@ -62,6 +74,7 @@ class Asset {
   final DateTime? dateOfBirth;
   final String? healthNotes;
   final String? lastEventId;
+  final String createdBy;
   final DateTime createdAt;
 
   const Asset({
@@ -69,90 +82,90 @@ class Asset {
     required this.tagName,
     required this.category,
     required this.breedType,
-    this.status = AssetStatus.ACTIVE,
+    this.status = AssetStatus.active,
     this.weightKg,
     this.dateOfBirth,
     this.healthNotes,
     this.lastEventId,
+    required this.createdBy,
     required this.createdAt,
   });
 
-  /// Dynamically computed from dateOfBirth to today.
   String get displayAge {
     if (dateOfBirth == null) return 'Unknown age';
     final now = DateTime.now();
-    int months = (now.year - dateOfBirth!.year) * 12 + (now.month - dateOfBirth!.month);
+    int months = (now.year - dateOfBirth!.year) * 12 +
+        (now.month - dateOfBirth!.month);
     if (now.day < dateOfBirth!.day) months--;
     if (months < 0) months = 0;
     if (months < 12) return '${months}mo';
     final years = months ~/ 12;
-    final rem = months % 12;
+    final rem   = months % 12;
     return rem > 0 ? '${years}yr ${rem}mo' : '${years}yr';
   }
 
-  /// Total months alive, for sorting/filtering.
   int get ageInMonths {
     if (dateOfBirth == null) return 0;
     final now = DateTime.now();
-    int months = (now.year - dateOfBirth!.year) * 12 + (now.month - dateOfBirth!.month);
+    int months = (now.year - dateOfBirth!.year) * 12 +
+        (now.month - dateOfBirth!.month);
     if (now.day < dateOfBirth!.day) months--;
     return months < 0 ? 0 : months;
   }
 
   Map<String, dynamic> toMap() => {
-        'asset_id': assetId,
-        'tag_name': tagName,
-        'category': category.name,
-        'breed_type': breedType,
-        'status': status.name,
-        'weight_kg': weightKg,
+        'asset_id':      assetId,
+        'tag_name':      tagName,
+        'category':      category.name,
+        'breed_type':    breedType,
+        'status':        status.name,
+        'weight_kg':     weightKg,
         'date_of_birth': dateOfBirth?.toIso8601String().substring(0, 10),
-        'health_notes': healthNotes,
+        'health_notes':  healthNotes,
         'last_event_id': lastEventId,
-        'created_at': createdAt.toIso8601String(),
+        'created_by':    createdBy,
+        'created_at':    createdAt.toIso8601String(),
       };
 
   factory Asset.fromMap(Map<String, dynamic> map) => Asset(
-        assetId: map['asset_id'] as String,
-        tagName: map['tag_name'] as String? ?? '',
-        category: AssetCategory.values.byName(map['category'] as String),
-        breedType: map['breed_type'] as String,
-        status: AssetStatus.values.byName(map['status'] as String),
-        weightKg: (map['weight_kg'] as num?)?.toDouble(),
+        assetId:     map['asset_id'] as String,
+        tagName:     map['tag_name'] as String? ?? '',
+        category:    AssetCategory.values.byName(map['category'] as String),
+        breedType:   map['breed_type'] as String,
+        status:      AssetStatus.values.byName(map['status'] as String),
+        weightKg:    (map['weight_kg'] as num?)?.toDouble(),
         dateOfBirth: map['date_of_birth'] != null
-            ? DateTime.tryParse(map['date_of_birth'] as String)
-            : null,
-        healthNotes: map['health_notes'] as String?,
-        lastEventId: map['last_event_id'] as String?,
-        createdAt: DateTime.parse(map['created_at'] as String),
+            ? DateTime.tryParse(map['date_of_birth'] as String) : null,
+        healthNotes:  map['health_notes'] as String?,
+        lastEventId:  map['last_event_id'] as String?,
+        createdBy:    map['created_by'] as String? ?? 'UNKNOWN',
+        createdAt:    DateTime.parse(map['created_at'] as String),
       );
 
   Asset copyWith({
-    String? tagName,
-    AssetStatus? status,
-    double? weightKg,
-    DateTime? dateOfBirth,
-    String? healthNotes,
-    String? lastEventId,
-  }) =>
-      Asset(
-        assetId: assetId,
-        tagName: tagName ?? this.tagName,
-        category: category,
-        breedType: breedType,
-        status: status ?? this.status,
-        weightKg: weightKg ?? this.weightKg,
+    String?       tagName,
+    AssetStatus?  status,
+    double?       weightKg,
+    DateTime?     dateOfBirth,
+    String?       healthNotes,
+    String?       lastEventId,
+    String?       createdBy,
+  }) => Asset(
+        assetId:     assetId,
+        tagName:     tagName     ?? this.tagName,
+        category:    category,
+        breedType:   breedType,
+        status:      status      ?? this.status,
+        weightKg:    weightKg    ?? this.weightKg,
         dateOfBirth: dateOfBirth ?? this.dateOfBirth,
         healthNotes: healthNotes ?? this.healthNotes,
         lastEventId: lastEventId ?? this.lastEventId,
-        createdAt: createdAt,
+        createdBy:   createdBy   ?? this.createdBy,
+        createdAt:   createdAt,
       );
 }
 
-// ── Inventory Model (upgraded with category and notes) ──────────────────────
-
-enum InventoryUnit { KG, LITRES, BAGS, PIECES, VIALS }
-enum InventoryCategory { FEED, MEDICINE, EQUIPMENT, SEED, OTHER }
+// ── InventoryItem ─────────────────────────────────────────────────────────────
 
 class InventoryItem {
   final String itemId;
@@ -162,10 +175,10 @@ class InventoryItem {
   final InventoryUnit unit;
   final double reorderLevel;
   final String? notes;
+  final String createdBy;
   final DateTime createdAt;
 
   bool get isLowStock => quantity <= reorderLevel;
-
   double get stockPercent =>
       reorderLevel == 0 ? 1.0 : (quantity / (reorderLevel * 3)).clamp(0.0, 1.0);
 
@@ -177,105 +190,147 @@ class InventoryItem {
     required this.unit,
     required this.reorderLevel,
     this.notes,
+    required this.createdBy,
     required this.createdAt,
   });
 
   Map<String, dynamic> toMap() => {
-        'item_id': itemId,
-        'item_name': itemName,
-        'category': category.name,
-        'quantity': quantity,
-        'unit': unit.name,
+        'item_id':       itemId,
+        'item_name':     itemName,
+        'category':      category.name,
+        'quantity':      quantity,
+        'unit':          unit.name,
         'reorder_level': reorderLevel,
-        'notes': notes,
-        'created_at': createdAt.toIso8601String(),
+        'notes':         notes,
+        'created_by':    createdBy,
+        'created_at':    createdAt.toIso8601String(),
       };
 
   factory InventoryItem.fromMap(Map<String, dynamic> map) => InventoryItem(
-        itemId: map['item_id'] as String,
-        itemName: map['item_name'] as String,
-        category: InventoryCategory.values.byName(
-            (map['category'] as String?) ?? 'FEED'),
-        quantity: (map['quantity'] as num).toDouble(),
-        unit: InventoryUnit.values.byName(map['unit'] as String),
+        itemId:       map['item_id'] as String,
+        itemName:     map['item_name'] as String,
+        category:     InventoryCategory.values
+            .byName((map['category'] as String?) ?? 'FEED'),
+        quantity:     (map['quantity'] as num).toDouble(),
+        unit:         InventoryUnit.values.byName(map['unit'] as String),
         reorderLevel: (map['reorder_level'] as num).toDouble(),
-        notes: map['notes'] as String?,
-        createdAt: DateTime.parse(map['created_at'] as String),
+        notes:        map['notes'] as String?,
+        createdBy:    map['created_by'] as String? ?? 'UNKNOWN',
+        createdAt:    DateTime.parse(map['created_at'] as String),
       );
 
-  InventoryItem copyWith({double? quantity}) => InventoryItem(
-        itemId: itemId,
-        itemName: itemName,
-        category: category,
-        quantity: quantity ?? this.quantity,
-        unit: unit,
+  InventoryItem copyWith({double? quantity, String? createdBy}) => InventoryItem(
+        itemId:       itemId,
+        itemName:     itemName,
+        category:     category,
+        quantity:     quantity   ?? this.quantity,
+        unit:         unit,
         reorderLevel: reorderLevel,
-        notes: notes,
-        createdAt: createdAt,
+        notes:        notes,
+        createdBy:    createdBy  ?? this.createdBy,
+        createdAt:    createdAt,
       );
 }
 
-// ── Financial Model (upgraded with transaction_type and description) ─────────
+// ── Financial ─────────────────────────────────────────────────────────────────
 
-enum PaymentMethod { MPESA, CASH, BANK }
-enum TransactionType { SALE, PURCHASE }
+enum TransactionType { sale, purchase }
 
 class Financial {
   final String transactionId;
   final TransactionType transactionType;
   final String customerSupplierName;
   final PaymentMethod paymentMethod;
+  final PaymentStatus paymentStatus;
   final double amount;
   final String? description;
   final bool isKraCertified;
   final String? kraReference;
+  final String? checkoutRequestId;
+  final String? mpesaReceipt;
   final String? eventId;
+  final String createdBy;
   final DateTime createdAt;
 
   const Financial({
     required this.transactionId,
-    this.transactionType = TransactionType.SALE,
+    required this.transactionType,
     required this.customerSupplierName,
     required this.paymentMethod,
+    this.paymentStatus = PaymentStatus.PAID,
     required this.amount,
     this.description,
     this.isKraCertified = false,
     this.kraReference,
+    this.checkoutRequestId,
+    this.mpesaReceipt,
     this.eventId,
+    required this.createdBy,
     required this.createdAt,
   });
 
   Map<String, dynamic> toMap() => {
-        'transaction_id': transactionId,
-        'transaction_type': transactionType.name,
+        'transaction_id':         transactionId,
+        'transaction_type':       transactionType.name,
         'customer_supplier_name': customerSupplierName,
-        'payment_method': paymentMethod.name,
-        'amount': amount,
-        'description': description,
-        'is_kra_certified': isKraCertified ? 1 : 0,
-        'kra_reference': kraReference,
-        'event_id': eventId,
-        'created_at': createdAt.toIso8601String(),
+        'payment_method':         paymentMethod.name,
+        'payment_status':         paymentStatus.name,
+        'amount':                 amount,
+        'description':            description,
+        'is_kra_certified':       isKraCertified ? 1 : 0,
+        'kra_reference':          kraReference,
+        'checkout_request_id':    checkoutRequestId,
+        'mpesa_receipt':          mpesaReceipt,
+        'event_id':               eventId,
+        'created_by':             createdBy,
+        'created_at':             createdAt.toIso8601String(),
       };
 
   factory Financial.fromMap(Map<String, dynamic> map) => Financial(
-        transactionId: map['transaction_id'] as String,
-        transactionType: TransactionType.values.byName(
-            (map['transaction_type'] as String?) ?? 'SALE'),
+        transactionId:        map['transaction_id'] as String,
+        transactionType:      TransactionType.values
+            .byName((map['transaction_type'] as String?) ?? 'sale'),
         customerSupplierName: map['customer_supplier_name'] as String,
-        paymentMethod: PaymentMethod.values.byName(map['payment_method'] as String),
-        amount: (map['amount'] as num).toDouble(),
-        description: map['description'] as String?,
-        isKraCertified: map['is_kra_certified'] is int
-            ? (map['is_kra_certified'] as int) == 1
-            : (map['is_kra_certified'] as bool? ?? false),
-        kraReference: map['kra_reference'] as String?,
-        eventId: map['event_id'] as String?,
-        createdAt: DateTime.parse(map['created_at'] as String).toUtc(),
+        paymentMethod:        PaymentMethod.values
+            .byName(map['payment_method'] as String),
+        paymentStatus:        PaymentStatus.values
+            .byName((map['payment_status'] as String?) ?? 'PAID'),
+        amount:               (map['amount'] as num).toDouble(),
+        description:          map['description'] as String?,
+        isKraCertified:       (map['is_kra_certified'] as int?) == 1,
+        kraReference:         map['kra_reference'] as String?,
+        checkoutRequestId:    map['checkout_request_id'] as String?,
+        mpesaReceipt:         map['mpesa_receipt'] as String?,
+        eventId:              map['event_id'] as String?,
+        createdBy:            map['created_by'] as String? ?? 'UNKNOWN',
+        createdAt:            DateTime.parse(map['created_at'] as String).toUtc(),
+      );
+
+  Financial copyWith({
+    String?        eventId,
+    String?        createdBy,
+    PaymentStatus? paymentStatus,
+    String?        checkoutRequestId,
+    String?        mpesaReceipt,
+  }) => Financial(
+        transactionId:        transactionId,
+        transactionType:      transactionType,
+        customerSupplierName: customerSupplierName,
+        paymentMethod:        paymentMethod,
+        paymentStatus:        paymentStatus      ?? this.paymentStatus,
+        amount:               amount,
+        description:          description,
+        isKraCertified:       isKraCertified,
+        kraReference:         kraReference,
+        checkoutRequestId:    checkoutRequestId  ?? this.checkoutRequestId,
+        mpesaReceipt:         mpesaReceipt       ?? this.mpesaReceipt,
+        eventId:              eventId            ?? this.eventId,
+        createdBy:            createdBy          ?? this.createdBy,
+        createdAt:            createdAt,
       );
 }
 
-// ── Dashboard Summary Model ───────────────────────────────────────────────────
+// ── DashboardSummary ──────────────────────────────────────────────────────────
 
 class DashboardSummary {
   final double totalSalesAllTime;
@@ -301,35 +356,16 @@ class DashboardSummary {
   double get netPosition => totalSalesAllTime - totalPurchasesAllTime;
 }
 
-// ── Asset Event Types ─────────────────────────────────────────────────────────
-
-enum LivestockEventType {
-  // Health
-  vaccination, deworming, vetVisit, medication, injury,
-  // Breeding
-  mating, pregnancyCheck, birth,
-  // Feeding
-  feedChange, supplement,
-  // Production
-  weightCheck, milkLog,
-  // Status
-  sold, deceased,
-}
-
-enum CropEventType {
-  planting, weeding, fertilizer, pesticide, irrigation,
-  harvest, cropLoss, other,
-}
-
-// ── Asset Event Model ─────────────────────────────────────────────────────────
+// ── AssetEvent ────────────────────────────────────────────────────────────────
 
 class AssetEvent {
   final String eventId;
   final String assetId;
-  final String eventType;   // raw string — covers both livestock + crop enums
+  final String eventType;
   final String? notes;
   final Map<String, dynamic>? metadata;
   final DateTime recordedAt;
+  final String createdBy;
   final DateTime createdAt;
 
   const AssetEvent({
@@ -339,12 +375,11 @@ class AssetEvent {
     this.notes,
     this.metadata,
     required this.recordedAt,
+    required this.createdBy,
     required this.createdAt,
   });
 
-  // Human-readable label
   String get displayLabel {
-    // Livestock
     switch (eventType) {
       case 'vaccination':    return 'Vaccination';
       case 'deworming':      return 'Deworming';
@@ -360,7 +395,6 @@ class AssetEvent {
       case 'milkLog':        return 'Milk Log';
       case 'sold':           return 'Sold';
       case 'deceased':       return 'Deceased';
-      // Crop
       case 'planting':       return 'Planting';
       case 'weeding':        return 'Weeding';
       case 'fertilizer':     return 'Fertilizer';
@@ -400,31 +434,42 @@ class AssetEvent {
   }
 
   Map<String, dynamic> toMap() => {
-        'event_id': eventId,
-        'asset_id': assetId,
-        'event_type': eventType,
-        'notes': notes,
-        'metadata': metadata != null ? jsonEncode(metadata) : null,
+        'event_id':    eventId,
+        'asset_id':    assetId,
+        'event_type':  eventType,
+        'notes':       notes,
+        'metadata':    metadata != null ? jsonEncode(metadata) : null,
         'recorded_at': recordedAt.toIso8601String(),
-        'created_at': createdAt.toIso8601String(),
+        'created_by':  createdBy,
+        'created_at':  createdAt.toIso8601String(),
       };
 
   factory AssetEvent.fromMap(Map<String, dynamic> map) => AssetEvent(
-        eventId: map['event_id'] as String,
-        assetId: map['asset_id'] as String,
-        eventType: map['event_type'] as String,
-        notes: map['notes'] as String?,
-        metadata: map['metadata'] != null
+        eventId:    map['event_id'] as String,
+        assetId:    map['asset_id'] as String,
+        eventType:  map['event_type'] as String,
+        notes:      map['notes'] as String?,
+        metadata:   map['metadata'] != null
             ? jsonDecode(map['metadata'] as String) as Map<String, dynamic>
             : null,
         recordedAt: DateTime.parse(map['recorded_at'] as String),
-        createdAt: DateTime.parse(map['created_at'] as String),
+        createdBy:  map['created_by'] as String? ?? 'UNKNOWN',
+        createdAt:  DateTime.parse(map['created_at'] as String),
+      );
+
+  AssetEvent copyWith({String? createdBy}) => AssetEvent(
+        eventId:    eventId,
+        assetId:    assetId,
+        eventType:  eventType,
+        notes:      notes,
+        metadata:   metadata,
+        recordedAt: recordedAt,
+        createdBy:  createdBy ?? this.createdBy,
+        createdAt:  createdAt,
       );
 }
 
-// ── Milk Log Model ────────────────────────────────────────────────────────────
-
-enum MilkSession { AM, PM, FULL }
+// ── MilkLog ───────────────────────────────────────────────────────────────────
 
 class MilkLog {
   final String logId;
@@ -433,6 +478,8 @@ class MilkLog {
   final MilkSession session;
   final DateTime recordedAt;
   final String? notes;
+  final String createdBy;
+  final DateTime createdAt;
 
   const MilkLog({
     required this.logId,
@@ -441,23 +488,40 @@ class MilkLog {
     required this.session,
     required this.recordedAt,
     this.notes,
+    required this.createdBy,
+    required this.createdAt,
   });
 
   Map<String, dynamic> toMap() => {
-        'log_id': logId,
-        'asset_id': assetId,
-        'litres': litres,
-        'session': session.name,
+        'log_id':      logId,
+        'asset_id':    assetId,
+        'litres':      litres,
+        'session':     session.name,
         'recorded_at': recordedAt.toIso8601String(),
-        'notes': notes,
+        'notes':       notes,
+        'created_by':  createdBy,
+        'created_at':  createdAt.toIso8601String(),
       };
 
   factory MilkLog.fromMap(Map<String, dynamic> map) => MilkLog(
-        logId: map['log_id'] as String,
-        assetId: map['asset_id'] as String,
-        litres: (map['litres'] as num).toDouble(),
-        session: MilkSession.values.byName(map['session'] as String),
+        logId:      map['log_id'] as String,
+        assetId:    map['asset_id'] as String,
+        litres:     (map['litres'] as num).toDouble(),
+        session:    MilkSession.values.byName(map['session'] as String),
         recordedAt: DateTime.parse(map['recorded_at'] as String),
-        notes: map['notes'] as String?,
+        notes:      map['notes'] as String?,
+        createdBy:  map['created_by'] as String? ?? 'UNKNOWN',
+        createdAt:  DateTime.parse(map['created_at'] as String),
+      );
+
+  MilkLog copyWith({String? createdBy}) => MilkLog(
+        logId:      logId,
+        assetId:    assetId,
+        litres:     litres,
+        session:    session,
+        recordedAt: recordedAt,
+        notes:      notes,
+        createdBy:  createdBy ?? this.createdBy,
+        createdAt:  createdAt,
       );
 }

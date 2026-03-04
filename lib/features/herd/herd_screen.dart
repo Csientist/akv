@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:uuid/uuid.dart';
 import '../../data/models/ledger_entry.dart';
 import '../../data/repositories/ledger_repository.dart';
+import '../../services/session_manager.dart';
 
 class HerdManagementScreen extends StatefulWidget {
   const HerdManagementScreen({super.key});
@@ -28,8 +29,8 @@ class _HerdManagementScreenState extends State<HerdManagementScreen>
   void dispose() { _tabController.dispose(); super.dispose(); }
 
   void _refresh() => setState(() {
-    _livestockFuture = _repo.getActiveAssets(AssetCategory.LIVESTOCK);
-    _cropFuture = _repo.getActiveAssets(AssetCategory.CROP);
+    _livestockFuture = _repo.getActiveAssets(AssetCategory.livestock);
+    _cropFuture = _repo.getActiveAssets(AssetCategory.crop);
   });
 
   @override
@@ -72,8 +73,8 @@ class _HerdManagementScreenState extends State<HerdManagementScreen>
         body: TabBarView(
           controller: _tabController,
           children: [
-            _AssetList(future: _livestockFuture, category: AssetCategory.LIVESTOCK, onRefresh: _refresh, repo: _repo),
-            _AssetList(future: _cropFuture, category: AssetCategory.CROP, onRefresh: _refresh, repo: _repo),
+            _AssetList(future: _livestockFuture, category: AssetCategory.livestock, onRefresh: _refresh, repo: _repo),
+            _AssetList(future: _cropFuture, category: AssetCategory.crop, onRefresh: _refresh, repo: _repo),
           ],
         ),
       ),
@@ -141,7 +142,7 @@ class _SummaryBanner extends StatelessWidget {
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(color: const Color(0xFF1B4332), borderRadius: BorderRadius.circular(20)),
       child: Row(mainAxisAlignment: MainAxisAlignment.spaceAround, children: [
-        _Stat('$total', category == AssetCategory.LIVESTOCK ? 'Total Head' : 'Total Plots'),
+        _Stat('$total', category == AssetCategory.livestock ? 'Total Head' : 'Total Plots'),
         _Stat('$healthy', 'Healthy'),
         _Stat('$attention', 'Attention', highlight: attention > 0),
       ]),
@@ -341,7 +342,7 @@ class _AnimalDetailSheetState extends State<_AnimalDetailSheet> {
               ],
               if (a.weightKg != null) _Chip(Icons.monitor_weight_outlined, 'Weight', '${a.weightKg!.toStringAsFixed(1)} kg'),
               _Chip(Icons.category_outlined, 'Category', a.category.name),
-              if (a.category == AssetCategory.LIVESTOCK)
+              if (a.category == AssetCategory.livestock)
                 FutureBuilder<double>(
                   future: _totalMilk,
                   builder: (_, s) => _Chip(Icons.water_drop_outlined, 'Total Milk',
@@ -420,10 +421,10 @@ class _StatusBadge extends StatelessWidget {
   const _StatusBadge(this.status);
   @override
   Widget build(BuildContext context) {
-    final color = status == AssetStatus.ACTIVE ? const Color(0xFF2D6A4F)
+    final color = status == AssetStatus.active ? const Color(0xFF2D6A4F)
         : status == AssetStatus.SOLD ? Colors.blue.shade700
         : Colors.red.shade700;
-    final bg = status == AssetStatus.ACTIVE ? const Color(0xFFD8F3DC)
+    final bg = status == AssetStatus.active ? const Color(0xFFD8F3DC)
         : status == AssetStatus.SOLD ? Colors.blue.shade50
         : Colors.red.shade50;
     return Container(
@@ -557,11 +558,13 @@ class _LogEventSheetState extends State<_LogEventSheet> {
   final _notesCtrl  = TextEditingController();
   final _meta1Ctrl  = TextEditingController(); // context-specific field 1
   final _meta2Ctrl  = TextEditingController(); // context-specific field 2
+  final userId = SessionManager.instance.currentUserId;
+
   DateTime _recordedAt = DateTime.now();
   bool _saving = false;
   MilkSession _milkSession = MilkSession.AM;
 
-  bool get _isLivestock => widget.asset.category == AssetCategory.LIVESTOCK;
+  bool get _isLivestock => widget.asset.category == AssetCategory.livestock;
 
   // Event types per category
   static const _livestockTypes = [
@@ -714,6 +717,7 @@ class _LogEventSheetState extends State<_LogEventSheet> {
         notes: _notesCtrl.text.trim().isNotEmpty ? _notesCtrl.text.trim() : null,
         metadata: _buildMetadata().isNotEmpty ? _buildMetadata() : null,
         recordedAt: _recordedAt,
+        createdBy: userId,
         createdAt: DateTime.now(),
       );
 
@@ -728,6 +732,8 @@ class _LogEventSheetState extends State<_LogEventSheet> {
             session: _milkSession,
             recordedAt: _recordedAt,
             notes: _notesCtrl.text.trim().isNotEmpty ? _notesCtrl.text.trim() : null,
+            createdBy: userId,
+            createdAt: DateTime.now()
           ));
         }
       }
@@ -908,6 +914,7 @@ class _AddAssetSheetState extends State<_AddAssetSheet> {
   late AssetStatus _status;
   DateTime? _dateOfBirth;
   bool _saving = false;
+  final userId = SessionManager.instance.currentUserId;
 
   bool get _isEdit => widget.existing != null;
 
@@ -919,8 +926,8 @@ class _AddAssetSheetState extends State<_AddAssetSheet> {
     _breedCtrl = TextEditingController(text: e?.breedType ?? '');
     _weightCtrl = TextEditingController(text: e?.weightKg?.toStringAsFixed(1) ?? '');
     _notesCtrl = TextEditingController(text: e?.healthNotes ?? '');
-    _category  = e?.category ?? AssetCategory.LIVESTOCK;
-    _status    = e?.status ?? AssetStatus.ACTIVE;
+    _category  = e?.category ?? AssetCategory.livestock;
+    _status    = e?.status ?? AssetStatus.active;
     _dateOfBirth = e?.dateOfBirth;
   }
 
@@ -943,6 +950,7 @@ class _AddAssetSheetState extends State<_AddAssetSheet> {
         weightKg: _weightCtrl.text.isNotEmpty ? double.tryParse(_weightCtrl.text) : null,
         dateOfBirth: _dateOfBirth,
         healthNotes: _notesCtrl.text.trim().isNotEmpty ? _notesCtrl.text.trim() : null,
+        createdBy: userId,
         createdAt: widget.existing?.createdAt ?? DateTime.now().toUtc(),
       );
       await widget.onSaved(asset);
@@ -982,7 +990,7 @@ class _AddAssetSheetState extends State<_AddAssetSheet> {
                   border: Border.all(color: sel ? const Color(0xFF2D6A4F) : const Color(0xFFD8E8E0)),
                 ),
                 child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-                  Icon(cat == AssetCategory.LIVESTOCK ? Icons.pets : Icons.grass, size: 16,
+                  Icon(cat == AssetCategory.livestock ? Icons.pets : Icons.grass, size: 16,
                       color: sel ? Colors.white : const Color(0xFF52796F)),
                   const SizedBox(width: 6),
                   Text(cat.name, style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13,
@@ -1071,9 +1079,9 @@ class _EmptyState extends StatelessWidget {
     child: Padding(
       padding: const EdgeInsets.all(40),
       child: Column(children: [
-        Icon(category == AssetCategory.LIVESTOCK ? Icons.pets : Icons.grass, size: 56, color: Colors.grey.shade300),
+        Icon(category == AssetCategory.livestock ? Icons.pets : Icons.grass, size: 56, color: Colors.grey.shade300),
         const SizedBox(height: 12),
-        Text('No ${category == AssetCategory.LIVESTOCK ? 'livestock' : 'crops'} registered',
+        Text('No ${category == AssetCategory.livestock ? 'livestock' : 'crops'} registered',
             style: TextStyle(color: Colors.grey.shade500, fontWeight: FontWeight.w600)),
         const SizedBox(height: 4),
         Text('Tap Register to add one', style: TextStyle(color: Colors.grey.shade400, fontSize: 12)),

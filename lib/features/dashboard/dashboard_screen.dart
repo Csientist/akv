@@ -409,7 +409,7 @@ class _ActivityTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isSale = txn.transactionType == TransactionType.SALE;
+    final isSale = txn.transactionType == TransactionType.sale;
     final color = isSale ? const Color(0xFF2D6A4F) : const Color(0xFF9B2226);
 
     return Container(

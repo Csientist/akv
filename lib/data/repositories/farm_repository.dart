@@ -9,7 +9,7 @@ class FarmRepository {
 
   // ── Add Livestock / Asset ──────────────────────────────────────────────────
   Future<void> addAsset({
-    required String category, // 'LIVESTOCK' or 'CROP'
+    required String category, // 'livestock' or 'crop'
     required String breedType,
     required String status,
     Map<String, dynamic>? metadata,

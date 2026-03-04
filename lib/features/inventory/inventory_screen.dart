@@ -3,6 +3,8 @@ import 'package:flutter/services.dart';
 import 'package:uuid/uuid.dart';
 import '../../data/models/ledger_entry.dart';
 import '../../data/repositories/ledger_repository.dart';
+import '../../services/session_manager.dart';
+
 
 class InventoryScreen extends StatefulWidget {
   const InventoryScreen({super.key});
@@ -386,6 +388,8 @@ class _AddInventorySheetState extends State<_AddInventorySheet> {
   final _qtyCtrl      = TextEditingController();
   final _reorderCtrl  = TextEditingController();
   final _notesCtrl    = TextEditingController();
+  final userId = SessionManager.instance.currentUserId;
+
   InventoryCategory _category = InventoryCategory.FEED;
   InventoryUnit _unit = InventoryUnit.KG;
   bool _saving = false;
@@ -408,6 +412,7 @@ class _AddInventorySheetState extends State<_AddInventorySheet> {
         unit: _unit,
         reorderLevel: double.tryParse(_reorderCtrl.text) ?? 0.0,
         notes: _notesCtrl.text.trim().isNotEmpty ? _notesCtrl.text.trim() : null,
+        createdBy: userId,
         createdAt: DateTime.now(),
       );
       await widget.onSaved(item);

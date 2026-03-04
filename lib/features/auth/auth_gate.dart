@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../services/pin_service.dart';
+import '../../services/session_manager.dart';
 import 'login_screen.dart';
 import 'pin_screens.dart';
 
@@ -27,16 +28,17 @@ class _AuthGateState extends State<AuthGate> {
   }
 
   Future<void> _checkAuth() async {
-    final hasSession = await PinService.instance.hasSession();
-    final hasPin     = await PinService.instance.hasPin();
+    // Try to restore the Appwrite session and populate SessionManager.
+    // This handles both "online first launch" and "offline subsequent launch".
+    final restored = await SessionManager.instance.restore();
+    final hasPin   = await PinService.instance.hasPin();
 
     if (!mounted) return;
 
     setState(() {
-      if (!hasSession) {
-        _state = _AuthState.needsLogin;
-      } else if (!hasPin)     { _state = _AuthState.needsPin;
-      }else {                  _state = _AuthState.needsUnlock;}
+      if (!restored)       {_state = _AuthState.needsLogin;}
+      else if (!hasPin)    {_state = _AuthState.needsPin;}
+      else                {_state = _AuthState.needsUnlock;}
     });
   }
 

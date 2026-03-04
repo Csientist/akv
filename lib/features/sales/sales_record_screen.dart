@@ -4,6 +4,7 @@ import 'package:uuid/uuid.dart';
 import '../../data/models/ledger_entry.dart';
 import '../../data/repositories/ledger_repository.dart';
 import '../../services/sync_service.dart';
+import '../../services/session_manager.dart';
 
 const _uuid = Uuid();
 
@@ -72,8 +73,8 @@ class _SalesScreenState extends State<SalesScreen> with SingleTickerProviderStat
         body: TabBarView(
           controller: _tabController,
           children: [
-            _TransactionForm(type: TransactionType.SALE, onSuccess: () => _tabController.animateTo(2)),
-            _TransactionForm(type: TransactionType.PURCHASE, onSuccess: () => _tabController.animateTo(2)),
+            _TransactionForm(type: TransactionType.sale, onSuccess: () => _tabController.animateTo(2)),
+            _TransactionForm(type: TransactionType.purchase, onSuccess: () => _tabController.animateTo(2)),
             const _HistoryTab(),
           ],
         ),
@@ -106,7 +107,7 @@ class _TransactionFormState extends State<_TransactionForm> {
   bool _isSaving = false;
   String? _successMessage;
 
-  bool get _isSale => widget.type == TransactionType.SALE;
+  bool get _isSale => widget.type == TransactionType.sale;
 
   @override
   void dispose() {
@@ -123,6 +124,7 @@ class _TransactionFormState extends State<_TransactionForm> {
       final amount = double.parse(_amountCtrl.text.trim());
       final sourceId = _uuid.v4();
       final txnId = _uuid.v4();
+      final userId = SessionManager.instance.currentUserId;
 
       final metadata = <String, dynamic>{
         'description': _descCtrl.text.trim(),
@@ -140,6 +142,7 @@ class _TransactionFormState extends State<_TransactionForm> {
         description: _descCtrl.text.trim().isNotEmpty ? _descCtrl.text.trim() : null,
         isKraCertified: _isKraCertified,
         kraReference: _isKraCertified ? _kraRefCtrl.text.trim() : null,
+        createdBy: userId,
         createdAt: DateTime.now(),
       );
 
@@ -346,8 +349,8 @@ class _HistoryTabState extends State<_HistoryTab> {
         }
 
         // Summary totals
-        final totalSales = records.where((r) => r.transactionType == TransactionType.SALE).fold(0.0, (s, r) => s + r.amount);
-        final totalPurchases = records.where((r) => r.transactionType == TransactionType.PURCHASE).fold(0.0, (s, r) => s + r.amount);
+        final totalSales = records.where((r) => r.transactionType == TransactionType.sale).fold(0.0, (s, r) => s + r.amount);
+        final totalPurchases = records.where((r) => r.transactionType == TransactionType.purchase).fold(0.0, (s, r) => s + r.amount);
 
         return ListView(
           padding: const EdgeInsets.fromLTRB(20, 20, 20, 40),
@@ -398,7 +401,7 @@ class _TxnTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isSale = record.transactionType == TransactionType.SALE;
+    final isSale = record.transactionType == TransactionType.sale;
     final color = isSale ? const Color(0xFF2D6A4F) : const Color(0xFF9B2226);
 
     return Container(

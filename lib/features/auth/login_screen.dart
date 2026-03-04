@@ -2,6 +2,7 @@ import 'package:appwrite/appwrite.dart';
 import 'package:flutter/material.dart';
 import '../../core/appwrite_client.dart';
 import '../../services/pin_service.dart';
+import '../../services/session_manager.dart';
 
 class LoginScreen extends StatefulWidget {
   final VoidCallback onLoggedIn;
@@ -45,6 +46,12 @@ class _LoginScreenState extends State<LoginScreen> {
       );
 
       await PinService.instance.saveSession(session.$id);
+
+      // Fetch the user profile and cache it in SessionManager so every
+      // subsequent DB write can stamp created_by without an Appwrite call.
+      final user = await account.get();
+      SessionManager.instance.setUser(user);
+
       widget.onLoggedIn();
     } on AppwriteException catch (e) {
       setState(() => _error = _friendlyError(e));

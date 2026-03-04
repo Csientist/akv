@@ -8,6 +8,7 @@ class AppwriteClient {
   late final Client client; // Renamed from _client so AuthService can access it
   late final Databases databases;
   late final Account account; // ADDED BACK: Crucial for your LoginScreen to work!
+  late final Functions functions;
 
   // ── Replace these with your Appwrite project values ──────────────────────
   static const _endpoint  = 'https://fra.cloud.appwrite.io/v1'; 
@@ -30,6 +31,7 @@ class AppwriteClient {
 
     databases = Databases(client);
     account = Account(client); // Initialize auth!
+    functions = Functions(client);
   }
 
   /// Push a single record to Appwrite. 
