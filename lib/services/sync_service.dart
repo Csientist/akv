@@ -100,11 +100,13 @@ class SyncService {
 
       await _db.removeFromQueue(queueId);
       dev.log('[Sync] ✓ Synced $tableName/$recordId');
+      print('✅ SUCCESS! Appwrite accepted $recordId');
 
     } catch (e) {
       await _db.markQueueRetry(queueId, retryCount);
       dev.log('[Sync] ✗ Failed $tableName/$recordId '
           '(attempt ${retryCount + 1}/$_maxRetries): $e');
+          print('🛑 APPWRITE REJECTED THE DATA! Error: $e');
     }
   }
 

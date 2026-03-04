@@ -44,7 +44,7 @@ class MpesaService {
 
   /// The Appwrite Function ID from your Appwrite Console.
   /// Set this once here — used by both initiatePayment calls.
-  static const _stkFunctionId = 'YOUR_MPESA_STK_FUNCTION_ID';
+  static const _stkFunctionId = '69a7e7520029ca740155';
 
   // ── Phone formatting ───────────────────────────────────────────────────────
   // Go function also sanitizes, but we do it here too so the log is clean

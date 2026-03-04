@@ -13,7 +13,7 @@ import 'core/local_db.dart';
 import 'services/sync_service.dart';
 
 // ── Feature Screen Imports ───────────────────────────────────────────────────
-import 'features/sales/sales_record_screen.dart'; 
+import 'features/sales/new_sales_screen.dart'; 
 import 'features/herd/herd_screen.dart';
 import 'features/inventory/inventory_screen.dart';
 import 'features/dashboard/dashboard_screen.dart';
@@ -164,7 +164,7 @@ class _AppShellState extends State<AppShell> {
 
   final List<Widget> _screens = const [
     DashboardScreen(),
-    SalesScreen(),
+    NewSaleScreen(),
     HerdManagementScreen(),
     InventoryScreen(),
   ];
