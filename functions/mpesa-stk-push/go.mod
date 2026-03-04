@@ -1,4 +1,4 @@
-module mpesa-stk-push
+module openruntimes/handler
 
 go 1.25.7
 

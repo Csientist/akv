@@ -1,4 +1,4 @@
-module mpesa-callback
+module openruntimes/handler
 
 go 1.25.7
 
