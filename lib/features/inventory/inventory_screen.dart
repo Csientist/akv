@@ -162,11 +162,11 @@ class _CategoryFilterRow extends StatelessWidget {
   const _CategoryFilterRow({required this.selected, required this.onChanged});
 
   static const _icons = {
-    InventoryCategory.FEED: Icons.grass,
-    InventoryCategory.MEDICINE: Icons.medical_services_outlined,
-    InventoryCategory.EQUIPMENT: Icons.build_outlined,
-    InventoryCategory.SEED: Icons.eco_outlined,
-    InventoryCategory.OTHER: Icons.category_outlined,
+    InventoryCategory.feed:      Icons.grass,
+    InventoryCategory.medicine:  Icons.medical_services_outlined,
+    InventoryCategory.equipment: Icons.build_outlined,
+    InventoryCategory.seed:      Icons.eco_outlined,
+    InventoryCategory.other:     Icons.category_outlined,
   };
 
   @override
@@ -223,11 +223,11 @@ class _InventoryCard extends StatelessWidget {
   const _InventoryCard({required this.item, required this.onAdjust});
 
   static const _catColors = {
-    InventoryCategory.FEED:      Color(0xFF2D6A4F),
-    InventoryCategory.MEDICINE:  Color(0xFF9B2226),
-    InventoryCategory.EQUIPMENT: Color(0xFF555B6E),
-    InventoryCategory.SEED:      Color(0xFF5C6B2E),
-    InventoryCategory.OTHER:     Color(0xFF6D6875),
+    InventoryCategory.feed:      Color(0xFF2D6A4F),
+    InventoryCategory.medicine:  Color(0xFF9B2226),
+    InventoryCategory.equipment: Color(0xFF555B6E),
+    InventoryCategory.seed:      Color(0xFF5C6B2E),
+    InventoryCategory.other:     Color(0xFF6D6875),
   };
 
   @override
@@ -390,8 +390,8 @@ class _AddInventorySheetState extends State<_AddInventorySheet> {
   final _notesCtrl    = TextEditingController();
   final userId = SessionManager.instance.currentUserId;
 
-  InventoryCategory _category = InventoryCategory.FEED;
-  InventoryUnit _unit = InventoryUnit.KG;
+  InventoryCategory _category = InventoryCategory.feed;
+  InventoryUnit _unit = InventoryUnit.kg;
   bool _saving = false;
 
   @override

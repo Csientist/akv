@@ -1,27 +1,34 @@
 import 'package:appwrite/appwrite.dart';
-import 'dart:developer' as dev;
+import '../core/logger.dart';
+
 
 class AppwriteClient {
   static final AppwriteClient instance = AppwriteClient._internal();
   AppwriteClient._internal();
 
-  late final Client client; // Renamed from _client so AuthService can access it
+  late final Client client;
   late final Databases databases;
-  late final Account account; // ADDED BACK: Crucial for your LoginScreen to work!
+  late final Account account;
   late final Functions functions;
+  late final Realtime realtime;
 
   // ── Replace these with your Appwrite project values ──────────────────────
-  static const _endpoint  = 'https://fra.cloud.appwrite.io/v1'; 
-  static const _projectId = '69a53fb00009c20573d6';
+  static const _endpoint   = 'https://fra.cloud.appwrite.io/v1';
+  static const _projectId  = '69a53fb00009c20573d6';
   static const _databaseId = '69a6d9c9002f3a1c4d7a';
 
+  /// Exposed so services (e.g. MpesaListenerService) can reference it
+  /// without duplicating the constant.
+  static const databaseId = _databaseId;
+
   // Collection IDs (must match Appwrite console)
-  static const colLedger     = 'ledger_entries';
-  static const colAssets     = 'assets';
-  static const colInventory  = 'inventory';
-  static const colFinancials = 'financials';
-  static const colAssetEvents = 'asset_events'; 
-  static const colMilkLogs    = 'milk_logs';      
+  static const colLedger          = 'ledger_entries';
+  static const colAssets          = 'assets';
+  static const colInventory       = 'inventory';
+  static const colFinancials      = 'financials';
+  static const colAssetEvents     = 'asset_events';
+  static const colMilkLogs        = 'milk_logs';
+  static const colPartialPayments = 'partial_payments';
 
   void init() {
     client = Client()
@@ -30,8 +37,9 @@ class AppwriteClient {
       ..setSelfSigned(status: true); 
 
     databases = Databases(client);
-    account = Account(client); // Initialize auth!
+    account   = Account(client);
     functions = Functions(client);
+    realtime  = Realtime(client);
   }
 
   /// Push a single record to Appwrite. 
@@ -51,7 +59,7 @@ class AppwriteClient {
         documentId: documentId,
         data: data,
       );
-      dev.log('[Appwrite] Updated document: $documentId');
+      Log.i('[Appwrite] Updated document: $documentId');
       
     } on AppwriteException catch (e) {
       if (e.code == 404) {
@@ -63,21 +71,21 @@ class AppwriteClient {
             documentId: documentId,
             data: data,
           );
-          dev.log('[Appwrite] Created new document: $documentId');
+          Log.i('[Appwrite] Created new document: $documentId');
         } on AppwriteException catch (createError) {
           // CRITICAL: If the network drops exactly here, we MUST rethrow 
           // so the SyncService doesn't mark it as 'synced'.
-          dev.log('[Appwrite] Create failed: ${createError.message}');
+          Log.e('[Appwrite] Create failed: ${createError.message}');
           rethrow; 
         }
       } else {
         // 3. Network timeout (code 0), Rate Limit (429), or Permission Error (401/403)
-        dev.log('[Appwrite] Update failed: ${e.message}');
+        Log.e('[Appwrite] Update failed: ${e.message}');
         rethrow; // CRITICAL: Keep it in the SQLite queue!
       }
     } catch (e) {
       // Catch-all for formatting errors or unexpected crashes
-      dev.log('[Appwrite] Fatal upsert error: $e');
+      Log.e('[Appwrite] Fatal upsert error: $e');
       rethrow;
     }
   }

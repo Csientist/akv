@@ -12,8 +12,10 @@ class PinService {
     aOptions: AndroidOptions(encryptedSharedPreferences: true),
   );
 
-  static const _sessionKey = 'appwrite_session';
-  static const _pinSetKey  = 'pin_is_set';
+  static const _sessionKey  = 'appwrite_session';
+  static const _pinSetKey   = 'pin_is_set';
+  static const _userIdKey   = 'appwrite_user_id';
+  static const _userNameKey = 'appwrite_user_name';
 
   // ── PIN Hashing ────────────────────────────────────────────────────────────
 
@@ -63,6 +65,16 @@ class PinService {
   Future<void> saveSession(String sessionId) =>
       _storage.write(key: _sessionKey, value: sessionId);
 
+  /// Caches the real Appwrite user ID so it survives offline restarts.
+  /// Call this immediately after a successful login alongside saveSession().
+  Future<void> saveUserId(String userId, {String? name}) async {
+    await _storage.write(key: _userIdKey, value: userId);
+    if (name != null) await _storage.write(key: _userNameKey, value: name);
+  }
+
+  Future<String?> getCachedUserId() => _storage.read(key: _userIdKey);
+  Future<String?> getCachedUserName() => _storage.read(key: _userNameKey);
+
   Future<String?> getSession() => _storage.read(key: _sessionKey);
 
   Future<bool> hasSession() async {
@@ -70,9 +82,13 @@ class PinService {
     return s != null && s.isNotEmpty;
   }
 
-  Future<void> clearSession() => _storage.delete(key: _sessionKey);
+  Future<void> clearSession() async {
+    await _storage.delete(key: _sessionKey);
+    await _storage.delete(key: _userIdKey);
+    await _storage.delete(key: _userNameKey);
+  }
 
-  Future<void> logout() => _storage.delete(key: _sessionKey);
+  Future<void> logout() => clearSession();
 
   Future<void> fullReset() async {
     await _storage.deleteAll();

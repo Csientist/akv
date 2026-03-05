@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../services/mpesa_listener_service.dart';
 import '../../services/pin_service.dart';
 import '../../services/session_manager.dart';
 import 'login_screen.dart';
@@ -44,7 +45,10 @@ class _AuthGateState extends State<AuthGate> {
 
   void _onLoggedIn() => setState(() => _state = _AuthState.needsPin);
   void _onPinSet()   => setState(() => _state = _AuthState.unlocked);
-  void _onUnlocked() => setState(() => _state = _AuthState.unlocked);
+  void _onUnlocked() {
+    MpesaListenerService.instance.start();
+    setState(() => _state = _AuthState.unlocked);
+  }
 
   @override
   Widget build(BuildContext context) {

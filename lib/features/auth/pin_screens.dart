@@ -157,95 +157,119 @@ class _PinScaffold extends StatelessWidget {
     return Scaffold(
       backgroundColor: const Color(0xFF1B4332),
       body: SafeArea(
-        child: Column(
-          children: [
-            const SizedBox(height: 60),
-            const Icon(Icons.grass, color: Colors.white, size: 48),
-            const SizedBox(height: 16),
-            Text(label,
-                style: const TextStyle(
-                    color: Colors.white, fontSize: 22, fontWeight: FontWeight.w700)),
-            const SizedBox(height: 6),
-            Text(sublabel,
-                style: TextStyle(color: Colors.white.withValues(alpha: 0.6), fontSize: 14)),
-            const SizedBox(height: 40),
+        child: LayoutBuilder(
+          builder: (context, constraints) => SingleChildScrollView(
+            child: ConstrainedBox(
+              constraints: BoxConstraints(minHeight: constraints.maxHeight),
+              child: IntrinsicHeight(
+                child: Column(
+                  children: [
+                    SizedBox(height: constraints.maxHeight * 0.1),
+                    const Icon(Icons.grass, color: Colors.white, size: 48),
+                    const SizedBox(height: 16),
+                    Text(label,
+                        style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 22,
+                            fontWeight: FontWeight.w700)),
+                    const SizedBox(height: 6),
+                    Text(sublabel,
+                        style: TextStyle(
+                            color: Colors.white.withValues(alpha: 0.6),
+                            fontSize: 14)),
+                    const SizedBox(height: 40),
 
-            // PIN dots
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: List.generate(4, (i) {
-                final filled = i < current.length;
-                return AnimatedContainer(
-                  duration: const Duration(milliseconds: 150),
-                  margin: const EdgeInsets.symmetric(horizontal: 10),
-                  width: 18, height: 18,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: filled ? Colors.white : Colors.transparent,
-                    border: Border.all(color: Colors.white, width: 2),
-                  ),
-                );
-              }),
-            ),
-
-            // Error message
-            const SizedBox(height: 16),
-            SizedBox(
-              height: 20,
-              child: error != null
-                  ? Text(error!,
-                      style: TextStyle(color: Colors.red.shade300, fontSize: 13))
-                  : null,
-            ),
-
-            const Spacer(),
-
-            // Numpad
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 48),
-              child: Column(
-                children: [
-                  for (final row in [['1','2','3'],['4','5','6'],['7','8','9']]) ...[
+                    // PIN dots
                     Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: row.map((d) => _DigitKey(digit: d, onTap: () => onKey(d))).toList(),
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: List.generate(4, (i) {
+                        final filled = i < current.length;
+                        return AnimatedContainer(
+                          duration: const Duration(milliseconds: 150),
+                          margin: const EdgeInsets.symmetric(horizontal: 10),
+                          width: 18,
+                          height: 18,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: filled ? Colors.white : Colors.transparent,
+                            border: Border.all(color: Colors.white, width: 2),
+                          ),
+                        );
+                      }),
                     ),
-                    const SizedBox(height: 12),
-                  ],
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      // Logout or spacer
-                      showLogout
-                          ? GestureDetector(
-                              onTap: onLogout,
-                              child: Container(
-                                width: 72, height: 72,
-                                alignment: Alignment.center,
-                                child: Text('Log out',
-                                    style: TextStyle(
-                                        color: Colors.white.withValues(alpha: 0.5),
-                                        fontSize: 12)),
+
+                    // Error message
+                    const SizedBox(height: 16),
+                    SizedBox(
+                      height: 20,
+                      child: error != null
+                          ? Text(error!,
+                              style: TextStyle(
+                                  color: Colors.red.shade300, fontSize: 13))
+                          : null,
+                    ),
+
+                    const Spacer(),
+
+                    // Numpad
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 48),
+                      child: Column(
+                        children: [
+                          for (final row in [
+                            ['1', '2', '3'],
+                            ['4', '5', '6'],
+                            ['7', '8', '9']
+                          ]) ...[
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: row
+                                  .map((d) =>
+                                      _DigitKey(digit: d, onTap: () => onKey(d)))
+                                  .toList(),
+                            ),
+                            const SizedBox(height: 12),
+                          ],
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              showLogout
+                                  ? GestureDetector(
+                                      onTap: onLogout,
+                                      child: Container(
+                                        width: 72,
+                                        height: 72,
+                                        alignment: Alignment.center,
+                                        child: Text('Log out',
+                                            style: TextStyle(
+                                                color: Colors.white
+                                                    .withValues(alpha: 0.5),
+                                                fontSize: 12)),
+                                      ),
+                                    )
+                                  : const SizedBox(width: 72, height: 72),
+                              _DigitKey(digit: '0', onTap: () => onKey('0')),
+                              GestureDetector(
+                                onTap: onBackspace,
+                                child: Container(
+                                  width: 72,
+                                  height: 72,
+                                  alignment: Alignment.center,
+                                  child: const Icon(Icons.backspace_outlined,
+                                      color: Colors.white, size: 24),
+                                ),
                               ),
-                            )
-                          : const SizedBox(width: 72, height: 72),
-                      _DigitKey(digit: '0', onTap: () => onKey('0')),
-                      GestureDetector(
-                        onTap: onBackspace,
-                        child: Container(
-                          width: 72, height: 72,
-                          alignment: Alignment.center,
-                          child: const Icon(Icons.backspace_outlined,
-                              color: Colors.white, size: 24),
-                        ),
+                            ],
+                          ),
+                        ],
                       ),
-                    ],
-                  ),
-                ],
+                    ),
+                    const SizedBox(height: 32),
+                  ],
+                ),
               ),
             ),
-            const SizedBox(height: 32),
-          ],
+          ),
         ),
       ),
     );

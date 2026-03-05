@@ -1,16 +1,72 @@
 import 'dart:convert';
 
-// ── Enums ─────────────────────────────────────────────────────────────────────
+// ── Enums (lowerCamelCase per Dart linter) ────────────────────────────────────
 
 enum LedgerType    { sale, purchase, herdUpdate, inventoryAdjust }
 enum LedgerStatus  { pending, completed, failed }
 enum AssetCategory { livestock, crop }
-enum AssetStatus   { active, SOLD, DECEASED }
-enum PaymentMethod { MPESA, CASH, BANK }
-enum PaymentStatus { PAID, PENDING, FAILED }
-enum InventoryUnit { KG, LITRES, BAGS, PIECES, VIALS }
-enum InventoryCategory { FEED, MEDICINE, EQUIPMENT, SEED, OTHER }
-enum MilkSession   { AM, PM, FULL }
+
+/// Fixed: was mixed-case { active, SOLD, DECEASED } — now consistent.
+enum AssetStatus   { active, sold, deceased }
+
+/// Fixed: was SCREAMING_CASE — now lowerCamelCase.
+enum PaymentMethod { mpesa, cash, bank }
+enum PaymentStatus { paid, pending, failed }
+enum InventoryUnit { kg, litres, bags, pieces, vials }
+enum InventoryCategory { feed, medicine, equipment, seed, other }
+enum MilkSession   { am, pm, full }
+
+// ── PartialPayment ────────────────────────────────────────────────────────────
+/// Represents a single payment instalment against a sale.
+/// Stored in the `partial_payments` table (see local_db.dart).
+
+class PartialPayment {
+  final String paymentId;
+  final String transactionId; // FK → financials.transaction_id
+  final double amount;
+  final PaymentMethod method;
+  final String? mpesaReceipt;
+  final String? checkoutRequestId;
+  final String? notes;
+  final String createdBy;
+  final DateTime createdAt;
+
+  const PartialPayment({
+    required this.paymentId,
+    required this.transactionId,
+    required this.amount,
+    required this.method,
+    this.mpesaReceipt,
+    this.checkoutRequestId,
+    this.notes,
+    required this.createdBy,
+    required this.createdAt,
+  });
+
+  Map<String, dynamic> toMap() => {
+        'payment_id':           paymentId,
+        'transaction_id':       transactionId,
+        'amount':               amount,
+        'method':               method.name,
+        'mpesa_receipt':        mpesaReceipt,
+        'checkout_request_id':  checkoutRequestId,
+        'notes':                notes,
+        'created_by':           createdBy,
+        'created_at':           createdAt.toIso8601String(),
+      };
+
+  factory PartialPayment.fromMap(Map<String, dynamic> map) => PartialPayment(
+        paymentId:          map['payment_id'] as String,
+        transactionId:      map['transaction_id'] as String,
+        amount:             (map['amount'] as num).toDouble(),
+        method:             PaymentMethod.values.byName(map['method'] as String),
+        mpesaReceipt:       map['mpesa_receipt'] as String?,
+        checkoutRequestId:  map['checkout_request_id'] as String?,
+        notes:              map['notes'] as String?,
+        createdBy:          map['created_by'] as String? ?? 'unknown',
+        createdAt:          DateTime.parse(map['created_at'] as String),
+      );
+}
 
 // ── LedgerEntry ───────────────────────────────────────────────────────────────
 
@@ -57,7 +113,7 @@ class LedgerEntry {
                 ? jsonDecode(map['metadata'] as String)
                 : map['metadata']) as Map<String, dynamic>
             : null,
-        createdBy: map['created_by'] as String? ?? 'UNKNOWN',
+        createdBy: map['created_by'] as String? ?? 'unknown',
         createdAt: DateTime.parse(map['created_at'] as String).toUtc(),
       );
 }
@@ -138,7 +194,7 @@ class Asset {
             ? DateTime.tryParse(map['date_of_birth'] as String) : null,
         healthNotes:  map['health_notes'] as String?,
         lastEventId:  map['last_event_id'] as String?,
-        createdBy:    map['created_by'] as String? ?? 'UNKNOWN',
+        createdBy:    map['created_by'] as String? ?? 'unknown',
         createdAt:    DateTime.parse(map['created_at'] as String),
       );
 
@@ -185,7 +241,7 @@ class InventoryItem {
   const InventoryItem({
     required this.itemId,
     required this.itemName,
-    this.category = InventoryCategory.FEED,
+    this.category = InventoryCategory.feed,
     required this.quantity,
     required this.unit,
     required this.reorderLevel,
@@ -210,12 +266,13 @@ class InventoryItem {
         itemId:       map['item_id'] as String,
         itemName:     map['item_name'] as String,
         category:     InventoryCategory.values
-            .byName((map['category'] as String?) ?? 'FEED'),
+            .byName((map['category'] as String?)?.toLowerCase() ?? 'feed'),
         quantity:     (map['quantity'] as num).toDouble(),
-        unit:         InventoryUnit.values.byName(map['unit'] as String),
+        unit:         InventoryUnit.values
+            .byName((map['unit'] as String).toLowerCase()),
         reorderLevel: (map['reorder_level'] as num).toDouble(),
         notes:        map['notes'] as String?,
-        createdBy:    map['created_by'] as String? ?? 'UNKNOWN',
+        createdBy:    map['created_by'] as String? ?? 'unknown',
         createdAt:    DateTime.parse(map['created_at'] as String),
       );
 
@@ -243,6 +300,8 @@ class Financial {
   final PaymentMethod paymentMethod;
   final PaymentStatus paymentStatus;
   final double amount;
+  /// How much has actually been collected so far (sum of partial_payments).
+  final double amountPaid;
   final String? description;
   final bool isKraCertified;
   final String? kraReference;
@@ -252,13 +311,18 @@ class Financial {
   final String createdBy;
   final DateTime createdAt;
 
+  double get amountOutstanding => (amount - amountPaid).clamp(0, double.infinity);
+  bool   get isFullyPaid       => amountOutstanding == 0;
+  bool   get hasPartialPayment => amountPaid > 0 && !isFullyPaid;
+
   const Financial({
     required this.transactionId,
     required this.transactionType,
     required this.customerSupplierName,
     required this.paymentMethod,
-    this.paymentStatus = PaymentStatus.PAID,
+    this.paymentStatus = PaymentStatus.paid,
     required this.amount,
+    this.amountPaid = 0.0,
     this.description,
     this.isKraCertified = false,
     this.kraReference,
@@ -276,6 +340,7 @@ class Financial {
         'payment_method':         paymentMethod.name,
         'payment_status':         paymentStatus.name,
         'amount':                 amount,
+        'amount_paid':            amountPaid,
         'description':            description,
         'is_kra_certified':       isKraCertified ? 1 : 0,
         'kra_reference':          kraReference,
@@ -289,20 +354,21 @@ class Financial {
   factory Financial.fromMap(Map<String, dynamic> map) => Financial(
         transactionId:        map['transaction_id'] as String,
         transactionType:      TransactionType.values
-            .byName((map['transaction_type'] as String?) ?? 'sale'),
+            .byName((map['transaction_type'] as String?)?.toLowerCase() ?? 'sale'),
         customerSupplierName: map['customer_supplier_name'] as String,
         paymentMethod:        PaymentMethod.values
-            .byName(map['payment_method'] as String),
+            .byName((map['payment_method'] as String).toLowerCase()),
         paymentStatus:        PaymentStatus.values
-            .byName((map['payment_status'] as String?) ?? 'PAID'),
+            .byName((map['payment_status'] as String?)?.toLowerCase() ?? 'paid'),
         amount:               (map['amount'] as num).toDouble(),
+        amountPaid:           (map['amount_paid'] as num?)?.toDouble() ?? 0.0,
         description:          map['description'] as String?,
         isKraCertified:       (map['is_kra_certified'] as int?) == 1,
         kraReference:         map['kra_reference'] as String?,
         checkoutRequestId:    map['checkout_request_id'] as String?,
         mpesaReceipt:         map['mpesa_receipt'] as String?,
         eventId:              map['event_id'] as String?,
-        createdBy:            map['created_by'] as String? ?? 'UNKNOWN',
+        createdBy:            map['created_by'] as String? ?? 'unknown',
         createdAt:            DateTime.parse(map['created_at'] as String).toUtc(),
       );
 
@@ -312,6 +378,7 @@ class Financial {
     PaymentStatus? paymentStatus,
     String?        checkoutRequestId,
     String?        mpesaReceipt,
+    double?        amountPaid,
   }) => Financial(
         transactionId:        transactionId,
         transactionType:      transactionType,
@@ -319,6 +386,7 @@ class Financial {
         paymentMethod:        paymentMethod,
         paymentStatus:        paymentStatus      ?? this.paymentStatus,
         amount:               amount,
+        amountPaid:           amountPaid         ?? this.amountPaid,
         description:          description,
         isKraCertified:       isKraCertified,
         kraReference:         kraReference,
@@ -336,16 +404,18 @@ class DashboardSummary {
   final double totalSalesAllTime;
   final double totalPurchasesAllTime;
   final double totalSalesThisMonth;
-  final int livestockCount;
-  final int cropCount;
-  final int lowStockCount;
-  final int pendingSyncCount;
+  final double totalOutstanding;   // NEW: sum of unpaid balances
+  final int    livestockCount;
+  final int    cropCount;
+  final int    lowStockCount;
+  final int    pendingSyncCount;
   final List<Financial> recentTransactions;
 
   const DashboardSummary({
     required this.totalSalesAllTime,
     required this.totalPurchasesAllTime,
     required this.totalSalesThisMonth,
+    this.totalOutstanding = 0.0,
     required this.livestockCount,
     required this.cropCount,
     required this.lowStockCount,
@@ -380,57 +450,57 @@ class AssetEvent {
   });
 
   String get displayLabel {
-    switch (eventType) {
-      case 'vaccination':    return 'Vaccination';
-      case 'deworming':      return 'Deworming';
-      case 'vetVisit':       return 'Vet Visit';
-      case 'medication':     return 'Medication';
-      case 'injury':         return 'Injury';
-      case 'mating':         return 'Mating';
-      case 'pregnancyCheck': return 'Pregnancy Check';
-      case 'birth':          return 'Birth';
-      case 'feedChange':     return 'Feed Change';
-      case 'supplement':     return 'Supplement';
-      case 'weightCheck':    return 'Weight Check';
-      case 'milkLog':        return 'Milk Log';
-      case 'sold':           return 'Sold';
-      case 'deceased':       return 'Deceased';
-      case 'planting':       return 'Planting';
-      case 'weeding':        return 'Weeding';
-      case 'fertilizer':     return 'Fertilizer';
-      case 'pesticide':      return 'Pesticide';
-      case 'irrigation':     return 'Irrigation';
-      case 'harvest':        return 'Harvest';
-      case 'cropLoss':       return 'Crop Loss';
-      default:               return eventType;
-    }
+    const labels = {
+      'vaccination':    'Vaccination',
+      'deworming':      'Deworming',
+      'vetVisit':       'Vet Visit',
+      'medication':     'Medication',
+      'injury':         'Injury',
+      'mating':         'Mating',
+      'pregnancyCheck': 'Pregnancy Check',
+      'birth':          'Birth',
+      'feedChange':     'Feed Change',
+      'supplement':     'Supplement',
+      'weightCheck':    'Weight Check',
+      'milkLog':        'Milk Log',
+      'sold':           'Sold',
+      'deceased':       'Deceased',
+      'planting':       'Planting',
+      'weeding':        'Weeding',
+      'fertilizer':     'Fertilizer',
+      'pesticide':      'Pesticide',
+      'irrigation':     'Irrigation',
+      'harvest':        'Harvest',
+      'cropLoss':       'Crop Loss',
+    };
+    return labels[eventType] ?? eventType;
   }
 
   String get emoji {
-    switch (eventType) {
-      case 'vaccination':    return '💉';
-      case 'deworming':      return '💊';
-      case 'vetVisit':       return '🏥';
-      case 'medication':     return '💊';
-      case 'injury':         return '🩹';
-      case 'mating':         return '🔗';
-      case 'pregnancyCheck': return '🔬';
-      case 'birth':          return '🐣';
-      case 'feedChange':     return '🌾';
-      case 'supplement':     return '🧪';
-      case 'weightCheck':    return '⚖️';
-      case 'milkLog':        return '🥛';
-      case 'sold':           return '💰';
-      case 'deceased':       return '🕊️';
-      case 'planting':       return '🌱';
-      case 'weeding':        return '🪴';
-      case 'fertilizer':     return '🧴';
-      case 'pesticide':      return '🪣';
-      case 'irrigation':     return '💧';
-      case 'harvest':        return '🌾';
-      case 'cropLoss':       return '⚠️';
-      default:               return '📋';
-    }
+    const emojis = {
+      'vaccination':    '💉',
+      'deworming':      '💊',
+      'vetVisit':       '🏥',
+      'medication':     '💊',
+      'injury':         '🩹',
+      'mating':         '🔗',
+      'pregnancyCheck': '🔬',
+      'birth':          '🐣',
+      'feedChange':     '🌾',
+      'supplement':     '🧪',
+      'weightCheck':    '⚖️',
+      'milkLog':        '🥛',
+      'sold':           '💰',
+      'deceased':       '🕊️',
+      'planting':       '🌱',
+      'weeding':        '🪴',
+      'fertilizer':     '🧴',
+      'pesticide':      '🪣',
+      'irrigation':     '💧',
+      'harvest':        '🌾',
+      'cropLoss':       '⚠️',
+    };
+    return emojis[eventType] ?? '📋';
   }
 
   Map<String, dynamic> toMap() => {
@@ -453,7 +523,7 @@ class AssetEvent {
             ? jsonDecode(map['metadata'] as String) as Map<String, dynamic>
             : null,
         recordedAt: DateTime.parse(map['recorded_at'] as String),
-        createdBy:  map['created_by'] as String? ?? 'UNKNOWN',
+        createdBy:  map['created_by'] as String? ?? 'unknown',
         createdAt:  DateTime.parse(map['created_at'] as String),
       );
 
@@ -507,10 +577,11 @@ class MilkLog {
         logId:      map['log_id'] as String,
         assetId:    map['asset_id'] as String,
         litres:     (map['litres'] as num).toDouble(),
-        session:    MilkSession.values.byName(map['session'] as String),
+        session:    MilkSession.values
+            .byName((map['session'] as String).toLowerCase()),
         recordedAt: DateTime.parse(map['recorded_at'] as String),
         notes:      map['notes'] as String?,
-        createdBy:  map['created_by'] as String? ?? 'UNKNOWN',
+        createdBy:  map['created_by'] as String? ?? 'unknown',
         createdAt:  DateTime.parse(map['created_at'] as String),
       );
 

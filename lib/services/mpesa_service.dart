@@ -1,7 +1,7 @@
 import 'dart:convert';
-import 'dart:developer' as dev;
 import 'package:appwrite/appwrite.dart';
 import '../core/appwrite_client.dart';
+import '../core/logger.dart';
 
 // ── Result type ───────────────────────────────────────────────────────────────
 // Gives callers structured feedback instead of a bare nullable String.
@@ -85,7 +85,7 @@ class MpesaService {
       return MpesaResult.fail('Amount must be at least KES 1.');
     }
 
-    dev.log('[M-PESA] STK Push → $formatted | KES ${amount.toInt()} | ref: $transactionId');
+    Log.i('[M-PESA] STK Push → $formatted | KES ${amount.toInt()} | ref: $transactionId');
 
     try {
       final execution = await AppwriteClient.instance.functions.createExecution(
@@ -102,7 +102,7 @@ class MpesaService {
       // 2. Parse the function's response body
       final rawBody = execution.responseBody;
       if (rawBody.isEmpty) {
-        dev.log('[M-PESA] Empty response body from function');
+        Log.i('[M-PESA] Empty response body from function');
         return MpesaResult.fail('No response from payment server.');
       }
 
@@ -110,7 +110,7 @@ class MpesaService {
       try {
         response = jsonDecode(rawBody) as Map<String, dynamic>;
       } catch (_) {
-        dev.log('[M-PESA] Non-JSON response: $rawBody');
+        Log.i('[M-PESA] Non-JSON response: $rawBody');
         return MpesaResult.fail('Unexpected response from payment server.');
       }
 
@@ -122,7 +122,7 @@ class MpesaService {
         final message     = response['customer_message'] as String?
             ?? 'Please enter your M-PESA PIN on your phone.';
 
-        dev.log('[M-PESA] STK sent. CheckoutID: $checkoutId');
+        Log.i('[M-PESA] STK sent. CheckoutID: $checkoutId');
         return MpesaResult.ok(
           checkoutRequestId: checkoutId,
           merchantRequestId: merchantId,
@@ -133,11 +133,11 @@ class MpesaService {
       // 4. Go function returned { success: false, error, code }
       final errMsg = response['error'] as String?
           ?? 'Payment request failed. Try again.';
-      dev.log('[M-PESA] Function returned error: $errMsg');
+      Log.e('[M-PESA] Function returned error: $errMsg');
       return MpesaResult.fail(errMsg);
 
     } on AppwriteException catch (e) {
-      dev.log('[M-PESA] Appwrite error: ${e.message} (code: ${e.code})');
+      Log.e('[M-PESA] Appwrite error: ${e.message} (code: ${e.code})');
       // Surface actionable messages for known codes
       final msg = switch (e.code) {
         404 => 'Payment function not found. Contact support.',
@@ -148,7 +148,7 @@ class MpesaService {
       return MpesaResult.fail(msg);
 
     } catch (e) {
-      dev.log('[M-PESA] Unexpected error: $e');
+      Log.e('[M-PESA] Unexpected error: $e');
       return MpesaResult.fail('Unexpected error. Please try again.');
     }
   }

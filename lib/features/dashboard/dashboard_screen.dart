@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import '../../data/models/ledger_entry.dart';
 import '../../data/repositories/ledger_repository.dart';
 import 'sync_debug_sheet.dart'; 
+import '../../shared/app_widgets.dart';
+
 
 
 class DashboardScreen extends StatefulWidget {
@@ -86,7 +88,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 const SizedBox(height: 20),
 
                 // ── Quick Stats Grid ─────────────────────────────────────
-                const _SectionLabel('Quick Stats'),
+                const SectionLabel('Quick Stats'),
                 const SizedBox(height: 12),
                 GridView.count(
                   shrinkWrap: true,
@@ -130,7 +132,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 const SizedBox(height: 24),
 
                 // ── Recent Activity ──────────────────────────────────────
-                const _SectionLabel('Recent Activity'),
+                const SectionLabel('Recent Activity'),
                 const SizedBox(height: 12),
                 if (s.recentTransactions.isEmpty)
                   _EmptyActivity()
@@ -484,15 +486,4 @@ class _EmptyActivity extends StatelessWidget {
               textAlign: TextAlign.center),
         ]),
       );
-}
-
-// ── Shared Widgets ────────────────────────────────────────────────────────────
-
-class _SectionLabel extends StatelessWidget {
-  final String text;
-  const _SectionLabel(this.text);
-  @override
-  Widget build(BuildContext context) => Text(text.toUpperCase(),
-      style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w700,
-          color: Color(0xFF2D6A4F), letterSpacing: 1.6));
 }

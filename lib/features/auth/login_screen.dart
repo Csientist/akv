@@ -52,6 +52,10 @@ class _LoginScreenState extends State<LoginScreen> {
       final user = await account.get();
       SessionManager.instance.setUser(user);
 
+      // Persist the real user ID to secure storage so offline restarts can
+      // restore created_by correctly without hitting Appwrite.
+      await PinService.instance.saveUserId(user.$id, name: user.name);
+
       widget.onLoggedIn();
     } on AppwriteException catch (e) {
       setState(() => _error = _friendlyError(e));

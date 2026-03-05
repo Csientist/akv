@@ -1,8 +1,9 @@
-import 'dart:developer' as dev;
 import 'package:connectivity_plus/connectivity_plus.dart';
 import '../core/local_db.dart';
 import '../core/appwrite_client.dart';
 import 'pin_service.dart';
+import '../core/logger.dart';
+
 
 class SyncService {
   final LocalDb _db;
@@ -26,7 +27,7 @@ class SyncService {
     // Gate 1: Connectivity
     final connectivityResults = await Connectivity().checkConnectivity();
     if (connectivityResults.contains(ConnectivityResult.none)) {
-      dev.log('[Sync] Offline — will retry when connected.');
+      Log.e('[Sync] Offline — will retry when connected.');
       return;
     }
 
@@ -34,29 +35,29 @@ class SyncService {
     // Without this, every record would get a 401 and burn through retries.
     final hasSession = await PinService.instance.hasSession();
     if (!hasSession) {
-      dev.log('[Sync] No Appwrite session — skipping until user logs in.');
+      Log.e('[Sync] No Appwrite session — skipping until user logs in.');
       return;
     }
 
     _isSyncing = true;
-    dev.log('[Sync] Starting sync loop...');
+    Log.i('[Sync] Starting sync loop...');
 
     try {
       final queue = await _db.getPendingQueue();
       if (queue.isEmpty) {
-        dev.log('[Sync] Queue is empty. Nothing to sync.');
+        Log.i('[Sync] Queue is empty. Nothing to sync.');
         return;
       }
 
-      dev.log('[Sync] ${queue.length} item(s) to sync.');
+      Log.i('[Sync] ${queue.length} item(s) to sync.');
       for (final item in queue) {
         await _syncItem(item);
       }
     } catch (e, stackTrace) {
-      dev.log('[Sync] Fatal error in sync loop: $e\n$stackTrace');
+      Log.e('[Sync] Fatal error in sync loop: $e\n$stackTrace');
     } finally {
       _isSyncing = false;
-      dev.log('[Sync] Sync loop complete.');
+      Log.i('[Sync] Sync loop complete.');
     }
   }
 
@@ -68,7 +69,7 @@ class SyncService {
 
     // Poison pill defence
     if (retryCount >= _maxRetries) {
-      dev.log('[Sync] 🛑 Item $queueId exceeded max retries. Marking as failed.');
+      Log.e('[Sync] 🛑 Item $queueId exceeded max retries. Marking as failed.');
       await _db.updateQueueStatus(queueId, 'failed');
       return;
     }
@@ -83,7 +84,7 @@ class SyncService {
       );
 
       if (rows.isEmpty) {
-        dev.log('[Sync] $recordId missing in $tableName — dropping from queue.');
+        Log.i('[Sync] $recordId missing in $tableName — dropping from queue.');
         await _db.removeFromQueue(queueId);
         return;
       }
@@ -99,14 +100,12 @@ class SyncService {
       );
 
       await _db.removeFromQueue(queueId);
-      dev.log('[Sync] ✓ Synced $tableName/$recordId');
-      print('✅ SUCCESS! Appwrite accepted $recordId');
+      Log.i('[Sync] ✓ Synced $tableName/$recordId');
 
     } catch (e) {
       await _db.markQueueRetry(queueId, retryCount);
-      dev.log('[Sync] ✗ Failed $tableName/$recordId '
+      Log.e('[Sync] ✗ Failed $tableName/$recordId '
           '(attempt ${retryCount + 1}/$_maxRetries): $e');
-          print('🛑 APPWRITE REJECTED THE DATA! Error: $e');
     }
   }
 
@@ -114,24 +113,26 @@ class SyncService {
 
   String _tableToCollection(String tableName) {
     switch (tableName) {
-      case 'ledger_entries': return AppwriteClient.colLedger;
-      case 'assets':         return AppwriteClient.colAssets;
-      case 'inventory':      return AppwriteClient.colInventory;
-      case 'financials':     return AppwriteClient.colFinancials;
-      case 'asset_events':   return AppwriteClient.colAssetEvents;
-      case 'milk_logs':      return AppwriteClient.colMilkLogs;
+      case 'ledger_entries':   return AppwriteClient.colLedger;
+      case 'assets':           return AppwriteClient.colAssets;
+      case 'inventory':        return AppwriteClient.colInventory;
+      case 'financials':       return AppwriteClient.colFinancials;
+      case 'asset_events':     return AppwriteClient.colAssetEvents;
+      case 'milk_logs':        return AppwriteClient.colMilkLogs;
+      case 'partial_payments': return AppwriteClient.colPartialPayments;
       default: throw Exception('[Sync] Unknown table: $tableName');
     }
   }
 
   String _primaryKeyWhereClause(String tableName) {
     switch (tableName) {
-      case 'ledger_entries': return 'event_id = ?';
-      case 'assets':         return 'asset_id = ?';
-      case 'inventory':      return 'item_id = ?';
-      case 'financials':     return 'transaction_id = ?';
-      case 'asset_events':   return 'event_id = ?';
-      case 'milk_logs':      return 'log_id = ?';
+      case 'ledger_entries':   return 'event_id = ?';
+      case 'assets':           return 'asset_id = ?';
+      case 'inventory':        return 'item_id = ?';
+      case 'financials':       return 'transaction_id = ?';
+      case 'asset_events':     return 'event_id = ?';
+      case 'milk_logs':        return 'log_id = ?';
+      case 'partial_payments': return 'payment_id = ?';
       default: throw Exception('[Sync] Unknown table: $tableName');
     }
   }
@@ -185,7 +186,7 @@ class SyncService {
     Connectivity().onConnectivityChanged.listen((List<ConnectivityResult> results) {
       // Hardening: Check if the list contains anything OTHER than 'none'
       if (!results.contains(ConnectivityResult.none)) {
-        dev.log('[SyncService] Network restored — triggering sync.');
+        Log.i('[SyncService] Network restored — triggering sync.');
         processQueue();
       }
     });

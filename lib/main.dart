@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'dart:developer' as dev;
 import 'dart:io'; // To check the platform
 import 'package:flutter/foundation.dart' show kIsWeb;
+import '../core/logger.dart';
+
 
 // SQLite Desktop Support
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
@@ -43,20 +44,20 @@ void main() async {
 
   // 4. Pre-warm the database
   try {
-    dev.log('[Boot] Initializing Local Database...');
+    Log.i('[Boot] Initializing Local Database...');
     await LocalDb.instance.database; 
-    dev.log('[Boot] Database ready.');
+    Log.i('[Boot] Database ready.');
   } catch (e) {
-    dev.log('[Boot] Fatal DB Error: $e');
+    Log.e('[Boot] Fatal DB Error: $e');
   }
 
   // 5. Initialize Appwrite & Background Sync
   try {
     AppwriteClient.instance.init();
     SyncService().listenForConnectivity();
-    dev.log('[Boot] Appwrite & Sync Service initialized.');
+    Log.i('[Boot] Appwrite & Sync Service initialized.');
   } catch (e) {
-    dev.log('[Boot] Backend init failed (Offline mode active): $e');
+    Log.i('[Boot] Backend init failed (Offline mode active): $e');
   }
 
   // 6. Run the App

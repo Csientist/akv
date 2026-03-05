@@ -2,6 +2,7 @@ import 'package:sqflite/sqflite.dart';
 import 'package:uuid/uuid.dart';
 import '../../core/local_db.dart';
 import '../../services/session_manager.dart';
+import '../../services/sync_service.dart';
 import '../models/ledger_entry.dart';
 
 const _uuid = Uuid();
@@ -9,8 +10,6 @@ const _uuid = Uuid();
 class LedgerRepository {
   final LocalDb _db;
   LedgerRepository({LocalDb? db}) : _db = db ?? LocalDb.instance;
-
-  // ── Convenience ────────────────────────────────────────────────────────────
 
   String get _uid => SessionManager.instance.currentUserId;
 
@@ -37,9 +36,10 @@ class LedgerRepository {
       await txn.insert('ledger_entries', entry.toMap());
       await txn.insert('financials',
           financial.copyWith(eventId: entry.eventId, createdBy: _uid).toMap());
-      await _db.addToQueue(txn, recordId: entry.eventId,          tableName: 'ledger_entries');
+      await _db.addToQueue(txn, recordId: entry.eventId,           tableName: 'ledger_entries');
       await _db.addToQueue(txn, recordId: financial.transactionId, tableName: 'financials');
     });
+    SyncService().processQueue();
     return entry;
   }
 
@@ -66,16 +66,99 @@ class LedgerRepository {
       await txn.insert('ledger_entries', entry.toMap());
       await txn.insert('financials',
           financial.copyWith(eventId: entry.eventId, createdBy: _uid).toMap());
-      await _db.addToQueue(txn, recordId: entry.eventId,           tableName: 'ledger_entries');
-      await _db.addToQueue(txn, recordId: financial.transactionId, tableName: 'financials');
+      await _db.addToQueue(txn, recordId: entry.eventId,            tableName: 'ledger_entries');
+      await _db.addToQueue(txn, recordId: financial.transactionId,  tableName: 'financials');
     });
+    SyncService().processQueue();
     return entry;
   }
 
-  // ── Save Asset (Create) ────────────────────────────────────────────────────
+  // ── Add a Partial Payment ──────────────────────────────────────────────────
+  /// Records one payment instalment against an existing sale.
+  /// Updates financials.amount_paid and recalculates payment_status atomically.
+
+  Future<PartialPayment> addPartialPayment({
+    required String transactionId,
+    required double amount,
+    required PaymentMethod method,
+    String? mpesaReceipt,
+    String? checkoutRequestId,
+    String? notes,
+  }) async {
+    final payment = PartialPayment(
+      paymentId:          _uuid.v4(),
+      transactionId:      transactionId,
+      amount:             amount,
+      method:             method,
+      mpesaReceipt:       mpesaReceipt,
+      checkoutRequestId:  checkoutRequestId,
+      notes:              notes,
+      createdBy:          _uid,
+      createdAt:          DateTime.now(),
+    );
+
+    final db = await _db.database;
+
+    await db.transaction((txn) async {
+      // 1. Insert the payment record
+      await txn.insert('partial_payments', payment.toMap());
+
+      // 2. Increment amount_paid on the parent financial record
+      await txn.rawUpdate('''
+        UPDATE financials
+        SET amount_paid = amount_paid + ?,
+            payment_status = CASE
+              WHEN (amount_paid + ?) >= amount THEN 'paid'
+              ELSE 'pending'
+            END
+        WHERE transaction_id = ?
+      ''', [amount, amount, transactionId]);
+
+      // 3. Queue both for cloud sync
+      await _db.addToQueue(txn,
+          recordId: payment.paymentId,
+          tableName: 'partial_payments');
+      await _db.addToQueue(txn,
+          recordId: transactionId,
+          tableName: 'financials',
+          operation: 'UPDATE');
+    });
+
+    SyncService().processQueue();
+    return payment;
+  }
+
+  // ── Get Partial Payments for a Transaction ─────────────────────────────────
+
+  Future<List<PartialPayment>> getPaymentsForTransaction(
+      String transactionId) async {
+    final db   = await _db.database;
+    final rows = await db.query(
+      'partial_payments',
+      where: 'transaction_id = ?',
+      whereArgs: [transactionId],
+      orderBy: 'created_at ASC',
+    );
+    return rows.map(PartialPayment.fromMap).toList();
+  }
+
+  // ── Get Outstanding Sales (partial or fully unpaid) ────────────────────────
+
+  Future<List<Financial>> getOutstandingSales() async {
+    final db   = await _db.database;
+    final rows = await db.query(
+      'financials',
+      where: "transaction_type = 'sale' AND payment_status = 'pending' AND created_by = ?",
+      whereArgs: [_uid],
+      orderBy: 'created_at DESC',
+    );
+    return rows.map(Financial.fromMap).toList();
+  }
+
+  // ── Save Asset ─────────────────────────────────────────────────────────────
 
   Future<Asset> saveAsset(Asset asset) async {
-    final db = await _db.database;
+    final db          = await _db.database;
     final ledgerEntry = LedgerEntry(
       eventId:   _uuid.v4(),
       type:      LedgerType.herdUpdate,
@@ -96,7 +179,7 @@ class LedgerRepository {
     return stamped;
   }
 
-  // ── Update Asset (Edit) ────────────────────────────────────────────────────
+  // ── Update Asset ───────────────────────────────────────────────────────────
 
   Future<void> updateAsset(Asset asset) async {
     final db = await _db.database;
@@ -117,7 +200,7 @@ class LedgerRepository {
     required InventoryItem item,
     required double delta,
   }) async {
-    final db = await _db.database;
+    final db      = await _db.database;
     final updated = item.copyWith(
         quantity: (item.quantity + delta).clamp(0, double.infinity));
     final ledgerEntry = LedgerEntry(
@@ -137,10 +220,10 @@ class LedgerRepository {
     return updated;
   }
 
-  // ── Add New Inventory Item ─────────────────────────────────────────────────
+  // ── Add Inventory Item ─────────────────────────────────────────────────────
 
   Future<InventoryItem> addInventoryItem(InventoryItem item) async {
-    final db     = await _db.database;
+    final db      = await _db.database;
     final stamped = item.copyWith(createdBy: _uid);
     await db.transaction((txn) async {
       await txn.insert('inventory', stamped.toMap());
@@ -158,7 +241,6 @@ class LedgerRepository {
       await txn.insert('asset_events', stamped.toMap());
       await _db.addToQueue(txn, recordId: event.eventId, tableName: 'asset_events');
 
-      // Side-effect: weight check → update asset weight (farm-wide)
       if (event.eventType == 'weightCheck' &&
           event.metadata?['weight_kg'] != null) {
         await txn.execute(
@@ -167,9 +249,8 @@ class LedgerRepository {
         );
       }
 
-      // Side-effect: sold/deceased → update asset status (farm-wide)
       if (event.eventType == 'sold' || event.eventType == 'deceased') {
-        final newStatus = event.eventType == 'sold' ? 'SOLD' : 'DECEASED';
+        final newStatus = event.eventType == 'sold' ? 'sold' : 'deceased';
         await txn.execute(
           'UPDATE assets SET status = ? WHERE asset_id = ?',
           [newStatus, event.assetId],
@@ -191,10 +272,10 @@ class LedgerRepository {
     return stamped;
   }
 
-  // ── Queries (all filtered by current user) ─────────────────────────────────
+  // ── Queries ────────────────────────────────────────────────────────────────
 
   Future<List<LedgerEntry>> getRecentLedger({int limit = 50}) async {
-    final db = await _db.database;
+    final db   = await _db.database;
     final rows = await db.query(
       'ledger_entries',
       where: 'created_by = ?',
@@ -206,7 +287,7 @@ class LedgerRepository {
   }
 
   Future<List<Asset>> getActiveAssets(AssetCategory category) async {
-    final db = await _db.database;
+    final db   = await _db.database;
     final rows = await db.query(
       'assets',
       where: "category = ? AND status = 'active'",
@@ -217,8 +298,7 @@ class LedgerRepository {
   }
 
   Future<List<InventoryItem>> getAllInventory() async {
-    final db = await _db.database;
-    // Inventory is farm-wide — show all, not per-user
+    final db   = await _db.database;
     final rows = await db.query(
       'inventory',
       orderBy: 'category ASC, item_name ASC',
@@ -227,7 +307,7 @@ class LedgerRepository {
   }
 
   Future<List<InventoryItem>> getLowStockItems() async {
-    final db = await _db.database;
+    final db   = await _db.database;
     final rows = await db.rawQuery(
       'SELECT * FROM inventory WHERE quantity <= reorder_level ORDER BY item_name',
     );
@@ -235,7 +315,7 @@ class LedgerRepository {
   }
 
   Future<List<Financial>> getRecentFinancials({int limit = 50}) async {
-    final db = await _db.database;
+    final db   = await _db.database;
     final rows = await db.query(
       'financials',
       where: 'created_by = ?',
@@ -246,19 +326,8 @@ class LedgerRepository {
     return rows.map(Financial.fromMap).toList();
   }
 
-  Future<List<Financial>> getUncertifiedTransactions() async {
-    final db = await _db.database;
-    final rows = await db.query(
-      'financials',
-      where: 'is_kra_certified = 0 AND created_by = ?',
-      whereArgs: [_uid],
-      orderBy: 'created_at DESC',
-    );
-    return rows.map(Financial.fromMap).toList();
-  }
-
   Future<List<AssetEvent>> getEventsForAsset(String assetId) async {
-    final db = await _db.database;
+    final db   = await _db.database;
     final rows = await db.query(
       'asset_events',
       where: 'asset_id = ?',
@@ -325,7 +394,14 @@ class LedgerRepository {
     );
     final totalSalesThisMonth = (salesMonthResult.first['total'] as num).toDouble();
 
-    // Livestock + crop counts — farm-wide, not per-user
+    // Outstanding: sum of (amount - amount_paid) for pending sales
+    final outstandingResult = await db.rawQuery(
+      "SELECT COALESCE(SUM(amount - amount_paid), 0.0) as total FROM financials "
+      "WHERE transaction_type = 'sale' AND payment_status = 'pending' AND created_by = ?",
+      [_uid],
+    );
+    final totalOutstanding = (outstandingResult.first['total'] as num).toDouble();
+
     final livestockResult = await db.rawQuery(
       "SELECT COUNT(*) as count FROM assets "
       "WHERE category = 'livestock' AND status = 'active'",
@@ -338,7 +414,6 @@ class LedgerRepository {
     );
     final cropCount = cropResult.first['count'] as int;
 
-    // Inventory + sync queue are farm-wide, not per-user
     final lowStockResult = await db.rawQuery(
       'SELECT COUNT(*) as count FROM inventory WHERE quantity <= reorder_level',
     );
@@ -362,6 +437,7 @@ class LedgerRepository {
       totalSalesAllTime:     totalSales,
       totalPurchasesAllTime: totalPurchases,
       totalSalesThisMonth:   totalSalesThisMonth,
+      totalOutstanding:      totalOutstanding,
       livestockCount:        livestockCount,
       cropCount:             cropCount,
       lowStockCount:         lowStockCount,
@@ -369,22 +445,4 @@ class LedgerRepository {
       recentTransactions:    recentTransactions,
     );
   }
-}
-
-// ── Extensions ─────────────────────────────────────────────────────────────────
-
-extension FinancialCopyWith on Financial {
-  Financial copyWith({String? eventId, String? createdBy}) => Financial(
-        transactionId:        transactionId,
-        transactionType:      transactionType,
-        customerSupplierName: customerSupplierName,
-        paymentMethod:        paymentMethod,
-        amount:               amount,
-        description:          description,
-        isKraCertified:       isKraCertified,
-        kraReference:         kraReference,
-        eventId:              eventId  ?? this.eventId,
-        createdBy:            createdBy ?? this.createdBy,
-        createdAt:            createdAt,
-      );
 }

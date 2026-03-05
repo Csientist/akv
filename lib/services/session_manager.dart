@@ -76,13 +76,17 @@ class SessionManager {
         clear();
         return false;
       }
-      // Network error — session token still exists, populate with cached ID
-      // so the app works offline. The next online restore will refresh it.
-      final sessionId = await PinService.instance.getSession();
-      if (sessionId != null) {
-        setUserId(sessionId); // fallback: use session token as ID placeholder
+      // Network error — restore from the cached user ID we saved at last login.
+      // This guarantees created_by stamps match the real Appwrite user ID even
+      // while offline, so records reconcile correctly once connectivity returns.
+      final cachedId   = await PinService.instance.getCachedUserId();
+      final cachedName = await PinService.instance.getCachedUserName();
+      if (cachedId != null) {
+        setUserId(cachedId, name: cachedName);
         return true;
       }
+      // No cached ID means the user has never successfully logged in on this
+      // device while online — force a fresh login to populate it.
       return false;
     }
   }

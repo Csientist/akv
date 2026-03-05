@@ -1,4 +1,4 @@
-package com.example.akv
+package com.akavango.app
 
 import io.flutter.embedding.android.FlutterActivity
 

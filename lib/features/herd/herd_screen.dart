@@ -4,6 +4,7 @@ import 'package:uuid/uuid.dart';
 import '../../data/models/ledger_entry.dart';
 import '../../data/repositories/ledger_repository.dart';
 import '../../services/session_manager.dart';
+import '../../shared/app_widgets.dart';
 
 class HerdManagementScreen extends StatefulWidget {
   const HerdManagementScreen({super.key});
@@ -116,7 +117,7 @@ class _AssetList extends StatelessWidget {
           children: [
             _SummaryBanner(assets: assets, category: category),
             const SizedBox(height: 20),
-            const _SectionLabel('Animals'),
+            const SectionLabel('Animals'),
             const SizedBox(height: 10),
             if (assets.isEmpty)
               _EmptyState(category: category)
@@ -378,7 +379,7 @@ class _AnimalDetailSheetState extends State<_AnimalDetailSheet> {
             const SizedBox(height: 24),
 
             // Event timeline
-            const _SectionLabel('Activity Timeline'),
+            const SectionLabel('Activity Timeline'),
             const SizedBox(height: 12),
             FutureBuilder<List<AssetEvent>>(
               future: _eventsFuture,
@@ -422,10 +423,10 @@ class _StatusBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final color = status == AssetStatus.active ? const Color(0xFF2D6A4F)
-        : status == AssetStatus.SOLD ? Colors.blue.shade700
+        : status == AssetStatus.sold ? Colors.blue.shade700
         : Colors.red.shade700;
     final bg = status == AssetStatus.active ? const Color(0xFFD8F3DC)
-        : status == AssetStatus.SOLD ? Colors.blue.shade50
+        : status == AssetStatus.sold ? Colors.blue.shade50
         : Colors.red.shade50;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
@@ -562,7 +563,7 @@ class _LogEventSheetState extends State<_LogEventSheet> {
 
   DateTime _recordedAt = DateTime.now();
   bool _saving = false;
-  MilkSession _milkSession = MilkSession.AM;
+  MilkSession _milkSession = MilkSession.am;
 
   bool get _isLivestock => widget.asset.category == AssetCategory.livestock;
 
@@ -768,7 +769,7 @@ class _LogEventSheetState extends State<_LogEventSheet> {
         const SizedBox(height: 20),
 
         // Event type grid
-        const _SectionLabel('Activity Type'),
+        const SectionLabel('Activity Type'),
         const SizedBox(height: 10),
         Wrap(
           spacing: 8, runSpacing: 8,
@@ -1062,15 +1063,6 @@ class _AddAssetSheetState extends State<_AddAssetSheet> {
 }
 
 // ── Shared Widgets ────────────────────────────────────────────────────────────
-
-class _SectionLabel extends StatelessWidget {
-  final String text;
-  const _SectionLabel(this.text);
-  @override
-  Widget build(BuildContext context) => Text(text.toUpperCase(),
-      style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: Color(0xFF2D6A4F), letterSpacing: 1.6));
-}
-
 class _EmptyState extends StatelessWidget {
   final AssetCategory category;
   const _EmptyState({required this.category});
