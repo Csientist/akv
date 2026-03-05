@@ -30,7 +30,7 @@ type DarajaCallback struct {
 	} `json:"Body"`
 }
 
-// Decoded financial document — matches your financials Appwrite collection
+// FinancialDoc Decoded financial document — matches your financials Appwrite collection
 type FinancialDoc struct {
 	*models.Document
 	CheckoutRequestID string `json:"checkout_request_id"`
@@ -46,26 +46,35 @@ type FinancialList struct {
 // ── Main ──────────────────────────────────────────────────────────────────────
 
 func Main(Context openruntimes.Context) openruntimes.Response {
-	// Safaricom requires a fast 200 OK or it will retry the callback.
-	// We always return 200 — errors are logged, never exposed to Safaricom.
+	Context.Log("========== DARAJA CALLBACK INITIATED ==========")
 
 	// 1. Parse Safaricom payload
+	rawBody := Context.Req.BodyRaw()
+	Context.Log("RAW PAYLOAD: " + rawBody) // Crucial for debugging malformed Daraja JSON
+
 	var payload DarajaCallback
-	if err := json.Unmarshal([]byte(Context.Req.BodyRaw()), &payload); err != nil {
-		Context.Error("Failed to parse Safaricom JSON: " + err.Error())
-		return ack(Context) // still 200 — malformed retries won't help
+	if err := json.Unmarshal([]byte(rawBody), &payload); err != nil {
+		Context.Error("FATAL: Failed to parse Safaricom JSON. Error: " + err.Error())
+		return ack(Context)
 	}
 
 	stk := payload.Body.StkCallback
+	Context.Log(fmt.Sprintf("Parsed STK Callback. CheckoutID: %s, ResultCode: %d", stk.CheckoutRequestID, stk.ResultCode))
 
 	// 2. Non-zero ResultCode = user cancelled, insufficient funds, timeout, etc.
 	if stk.ResultCode != 0 {
 		Context.Log(fmt.Sprintf(
-			"Payment not completed. CheckoutID: %s | Code: %d | Desc: %s",
+			"⚠️ Payment not completed. CheckoutID: %s | Code: %d | Desc: %s",
 			stk.CheckoutRequestID, stk.ResultCode, stk.ResultDesc,
 		))
-		// Optionally mark the transaction as FAILED in Appwrite here
-		_ = markFailed(Context, stk.CheckoutRequestID, stk.ResultDesc)
+
+		Context.Log("Attempting to mark transaction as FAILED in DB...")
+		err := markFailed(Context, stk.CheckoutRequestID, stk.ResultDesc)
+		if err != nil {
+			Context.Error("❌ Failed to update DB with FAILED status: " + err.Error())
+		} else {
+			Context.Log("✅ Transaction successfully marked as FAILED in DB.")
+		}
 		return ack(Context)
 	}
 
@@ -75,13 +84,12 @@ func Main(Context openruntimes.Context) openruntimes.Response {
 	phone := extractMetaString(stk.CallbackMetadata.Item, "PhoneNumber")
 
 	Context.Log(fmt.Sprintf(
-		"Payment success. Receipt: %s | Amount: %.0f | Phone: %s",
+		"💰 Payment Success Extracted. Receipt: %s | Amount: %.0f | Phone: %s",
 		mpesaReceipt, amount, phone,
 	))
 
-	// 4. Connect to Appwrite with the injected API key
-	// APPWRITE_FUNCTION_API_ENDPOINT and APPWRITE_FUNCTION_PROJECT_ID are
-	// injected automatically by the Appwrite Functions runtime.
+	// 4. Connect to Appwrite
+	Context.Log("Initializing Appwrite Client...")
 	client := appwrite.NewClient(
 		appwrite.WithEndpoint(os.Getenv("APPWRITE_FUNCTION_API_ENDPOINT")),
 		appwrite.WithProject(os.Getenv("APPWRITE_FUNCTION_PROJECT_ID")),
@@ -92,31 +100,39 @@ func Main(Context openruntimes.Context) openruntimes.Response {
 	dbID := os.Getenv("APPWRITE_DB_ID")
 	colID := os.Getenv("APPWRITE_COL_FINANCIALS")
 
+	if dbID == "" || colID == "" {
+		Context.Error("FATAL: Missing APPWRITE_DB_ID or APPWRITE_COL_FINANCIALS environment variables.")
+	}
+
 	// 5. Find the matching transaction by checkout_request_id
-	// query.Equal returns a properly formatted Appwrite query string
+	Context.Log(fmt.Sprintf("Searching DB (%s) Col (%s) for CheckoutRequestID: %s", dbID, colID, stk.CheckoutRequestID))
+
 	listResp, err := databases.ListDocuments(dbID, colID,
 		databases.WithListDocumentsQueries([]string{
 			query.Equal("checkout_request_id", stk.CheckoutRequestID),
 		}),
 	)
 	if err != nil {
-		Context.Error("ListDocuments failed: " + err.Error())
+		Context.Error("❌ ListDocuments failed: " + err.Error())
 		return ack(Context)
 	}
 
 	var financials FinancialList
 	if err := listResp.Decode(&financials); err != nil {
-		Context.Error("Failed to decode documents: " + err.Error())
+		Context.Error("❌ Failed to decode Appwrite documents: " + err.Error())
 		return ack(Context)
 	}
 
+	Context.Log(fmt.Sprintf("Found %d matching document(s).", len(financials.Documents)))
+
 	if len(financials.Documents) == 0 {
-		Context.Error("No transaction found for CheckoutRequestID: " + stk.CheckoutRequestID)
+		Context.Error("❌ No transaction found for CheckoutRequestID: " + stk.CheckoutRequestID)
 		return ack(Context)
 	}
 
 	// 6. Update the document — mark COMPLETED with receipt
 	transactionID := financials.Documents[0].Id
+	Context.Log("Attempting to update document ID: " + transactionID)
 
 	_, err = databases.UpdateDocument(dbID, colID, transactionID,
 		databases.WithUpdateDocumentData(map[string]interface{}{
@@ -126,22 +142,21 @@ func Main(Context openruntimes.Context) openruntimes.Response {
 		}),
 	)
 	if err != nil {
-		Context.Error("UpdateDocument failed for " + transactionID + ": " + err.Error())
+		Context.Error("❌ UpdateDocument failed for " + transactionID + ": " + err.Error())
 	} else {
-		Context.Log("Transaction marked COMPLETED: " + transactionID)
+		Context.Log("✅ Transaction successfully marked COMPLETED in Appwrite: " + transactionID)
 	}
 
+	Context.Log("========== DARAJA CALLBACK FINISHED ==========")
 	return ack(Context)
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-// ack returns the 200 OK Safaricom expects. Always call this.
 func ack(Context openruntimes.Context) openruntimes.Response {
 	return Context.Res.Text("Success", Context.Res.WithStatusCode(200))
 }
 
-// markFailed updates a transaction to FAILED status without crashing if it errors.
 func markFailed(Context openruntimes.Context, checkoutID, reason string) error {
 	client := appwrite.NewClient(
 		appwrite.WithEndpoint(os.Getenv("APPWRITE_FUNCTION_API_ENDPOINT")),
@@ -158,12 +173,16 @@ func markFailed(Context openruntimes.Context, checkoutID, reason string) error {
 		}),
 	)
 	if err != nil {
-		return err
+		return fmt.Errorf("ListDocuments query failed: %w", err)
 	}
 
 	var financials FinancialList
-	if err := listResp.Decode(&financials); err != nil || len(financials.Documents) == 0 {
-		return fmt.Errorf("no doc found for %s", checkoutID)
+	if err := listResp.Decode(&financials); err != nil {
+		return fmt.Errorf("failed to decode response: %w", err)
+	}
+
+	if len(financials.Documents) == 0 {
+		return fmt.Errorf("no matching document found to update")
 	}
 
 	_, err = databases.UpdateDocument(dbID, colID, financials.Documents[0].Id,
@@ -172,10 +191,13 @@ func markFailed(Context openruntimes.Context, checkoutID, reason string) error {
 			"fail_reason": reason,
 		}),
 	)
-	return err
+	if err != nil {
+		return fmt.Errorf("UpdateDocument failed: %w", err)
+	}
+
+	return nil
 }
 
-// extractMetaString pulls a string value from the Safaricom metadata item array.
 func extractMetaString(items []struct {
 	Name  string      `json:"Name"`
 	Value interface{} `json:"Value"`
@@ -188,7 +210,6 @@ func extractMetaString(items []struct {
 	return ""
 }
 
-// extractMetaFloat pulls a numeric value from the Safaricom metadata item array.
 func extractMetaFloat(items []struct {
 	Name  string      `json:"Name"`
 	Value interface{} `json:"Value"`

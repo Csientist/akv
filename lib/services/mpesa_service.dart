@@ -99,18 +99,35 @@ class MpesaService {
         xasync: false,
       );
 
-      // 2. Parse the function's response body
-      final rawBody = execution.responseBody;
-      if (rawBody.isEmpty) {
+      // 2. Parse the function's response body.
+      String cleanBody = execution.responseBody;
+      
+      // Strip literal quotes if Appwrite returned the string wrapped in them
+      if (cleanBody.startsWith('"') && cleanBody.endsWith('"')) {
+        cleanBody = cleanBody.substring(1, cleanBody.length - 1);
+      }
+
+      if (cleanBody.isEmpty) {
         Log.i('[M-PESA] Empty response body from function');
         return MpesaResult.fail('No response from payment server.');
       }
 
+      String decodedBody;
+      try {
+        // Pad to a multiple of 4 if needed
+        final padded = cleanBody.padRight(
+          (cleanBody.length + 3) ~/ 4 * 4, '=',
+        );
+        decodedBody = utf8.decode(base64Url.decode(padded));
+      } catch (_) {
+        decodedBody = cleanBody; // fallback
+      }
+
       final Map<String, dynamic> response;
       try {
-        response = jsonDecode(rawBody) as Map<String, dynamic>;
+        response = jsonDecode(decodedBody) as Map<String, dynamic>;
       } catch (_) {
-        Log.i('[M-PESA] Non-JSON response: $rawBody');
+        Log.i('[M-PESA] Non-JSON response: $decodedBody');
         return MpesaResult.fail('Unexpected response from payment server.');
       }
 
