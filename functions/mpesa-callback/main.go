@@ -132,10 +132,10 @@ func Main(Context openruntimes.Context) openruntimes.Response {
 
 	_, err = databases.UpdateDocument(dbID, colID, transactionID,
 		databases.WithUpdateDocumentData(map[string]interface{}{
-			"mpesa_receipt": mpesaReceipt,
-			"status":        "COMPLETED",
-			"amount_paid":   amount,
-			"notes":         description,
+			"mpesa_receipt":  mpesaReceipt,
+			"payment_status": "paid",
+			"amount_paid":    amount,
+			"notes":          description,
 		}),
 	)
 	if err != nil {
