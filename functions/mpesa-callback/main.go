@@ -8,6 +8,7 @@ import (
 	"github.com/appwrite/sdk-for-go/appwrite"
 	"github.com/appwrite/sdk-for-go/models"
 	"github.com/appwrite/sdk-for-go/query"
+	"github.com/appwrite/sdk-for-go/tablesdb"
 	"github.com/open-runtimes/types-for-go/v4/openruntimes"
 )
 
@@ -28,17 +29,16 @@ type DarajaCallback struct {
 	} `json:"Body"`
 }
 
-// FinancialDoc Decoded financial document — matches your financials Appwrite collection
-type FinancialDoc struct {
-	*models.Document
+type FinancialRow struct {
+	*models.Row
 	CheckoutRequestID string `json:"checkout_request_id"`
 	PaymentStatus     string `json:"payment_status"`
 	MpesaReceipt      string `json:"mpesa_receipt"`
 }
 
-type FinancialList struct {
-	*models.DocumentList
-	Documents []FinancialDoc `json:"documents"`
+type FinancialRowList struct {
+	*models.RowList
+	Rows []FinancialRow `json:"rows"`
 }
 
 func Main(Context openruntimes.Context) openruntimes.Response {
@@ -54,145 +54,128 @@ func Main(Context openruntimes.Context) openruntimes.Response {
 	}
 
 	stk := payload.Body.StkCallback
-	Context.Log(fmt.Sprintf("Parsed STK Callback. CheckoutID: %s, ResultCode: %d", stk.CheckoutRequestID, stk.ResultCode))
+	Context.Log(fmt.Sprintf("Parsed STK Callback. CheckoutID: %s, ResultCode: %d",
+		stk.CheckoutRequestID, stk.ResultCode))
 
-	// 2. Non-zero ResultCode = user cancelled, insufficient funds, timeout, etc.
+	// Build client once — passed into helpers to avoid re-init
+	client := appwrite.NewClient(
+		appwrite.WithEndpoint(os.Getenv("APPWRITE_FUNCTION_API_ENDPOINT")),
+		appwrite.WithProject(os.Getenv("APPWRITE_FUNCTION_PROJECT_ID")),
+		appwrite.WithKey(os.Getenv("APPWRITE_API_KEY")),
+	)
+	db := tablesdb.New(client)
+	dbID := os.Getenv("APPWRITE_DB_ID")
+	tableID := os.Getenv("APPWRITE_TABLE_FINANCIALS")
+
+	if dbID == "" || tableID == "" {
+		Context.Error("FATAL: Missing APPWRITE_DB_ID or APPWRITE_TABLE_FINANCIALS env vars.")
+	}
+
 	if stk.ResultCode != 0 {
 		Context.Log(fmt.Sprintf(
 			"⚠️ Payment not completed. CheckoutID: %s | Code: %d | Desc: %s",
 			stk.CheckoutRequestID, stk.ResultCode, stk.ResultDesc,
 		))
-
-		Context.Log("Attempting to mark transaction as FAILED in DB...")
-		err := markFailed(Context, stk.CheckoutRequestID, stk.ResultDesc)
-		if err != nil {
-			Context.Error("❌ Failed to update DB with FAILED status: " + err.Error())
+		if err := markFailed(Context, db, dbID, tableID, stk.CheckoutRequestID, stk.ResultDesc); err != nil {
+			Context.Error("❌ Failed to mark transaction as failed: " + err.Error())
 		} else {
 			Context.Log("✅ Transaction marked as failed.")
 		}
 		return ack(Context)
 	}
 
-	// 3. Extract M-PESA receipt number from the metadata array
 	mpesaReceipt := extractMetaString(stk.CallbackMetadata.Item, "MpesaReceiptNumber")
 	amount := extractMetaFloat(stk.CallbackMetadata.Item, "Amount")
 	phone := extractMetaString(stk.CallbackMetadata.Item, "PhoneNumber")
-	description := stk.ResultDesc
 
 	Context.Log(fmt.Sprintf(
-		"💰 Payment Success Extracted. Receipt: %s | Amount: %.0f | Phone: %s",
+		"💰 Payment success. Receipt: %s | Amount: %.0f | Phone: %s",
 		mpesaReceipt, amount, phone,
 	))
 
-	// 4. Connect to Appwrite
-	Context.Log("Initializing Appwrite Client...")
-	client := appwrite.NewClient(
-		appwrite.WithEndpoint(os.Getenv("APPWRITE_FUNCTION_API_ENDPOINT")),
-		appwrite.WithProject(os.Getenv("APPWRITE_FUNCTION_PROJECT_ID")),
-		appwrite.WithKey(os.Getenv("APPWRITE_API_KEY")),
-	)
-	databases := appwrite.NewDatabases(client)
+	Context.Log(fmt.Sprintf("Querying table %s for CheckoutRequestID: %s", tableID, stk.CheckoutRequestID))
 
-	dbID := os.Getenv("APPWRITE_DB_ID")
-	colID := os.Getenv("APPWRITE_COL_FINANCIALS")
-
-	if dbID == "" || colID == "" {
-		Context.Error("FATAL: Missing APPWRITE_DB_ID or APPWRITE_COL_FINANCIALS environment variables.")
-	}
-
-	// 5. Find the matching transaction by checkout_request_id
-	Context.Log(fmt.Sprintf("Searching DB (%s) Col (%s) for CheckoutRequestID: %s", dbID, colID, stk.CheckoutRequestID))
-
-	listResp, err := databases.ListDocuments(dbID, colID,
-		databases.WithListDocumentsQueries([]string{
+	listResp, err := db.ListRows(dbID, tableID,
+		db.WithListRowsQueries([]string{
 			query.Equal("checkout_request_id", stk.CheckoutRequestID),
 		}),
 	)
 	if err != nil {
-		Context.Error("❌ ListDocuments failed: " + err.Error())
+		Context.Error("❌ ListRows failed: " + err.Error())
 		return ack(Context)
 	}
 
-	var financials FinancialList
+	var financials FinancialRowList
 	if err := listResp.Decode(&financials); err != nil {
 		Context.Error("❌ Failed to decode rows: " + err.Error())
 		return ack(Context)
 	}
 
-	Context.Log(fmt.Sprintf("Found %d matching document(s).", len(financials.Documents)))
+	Context.Log(fmt.Sprintf("Found %d matching row(s).", len(financials.Rows)))
 
-	if len(financials.Documents) == 0 {
+	if len(financials.Rows) == 0 {
 		Context.Error("❌ No transaction found for CheckoutRequestID: " + stk.CheckoutRequestID)
 		return ack(Context)
 	}
 
-	// 6. Update the document — mark COMPLETED with receipt
-	transactionID := financials.Documents[0].Id
-	Context.Log("Attempting to update document ID: " + transactionID)
+	rowID := financials.Rows[0].Id
+	Context.Log("Updating row ID: " + rowID)
 
-	_, err = databases.UpdateDocument(dbID, colID, transactionID,
-		databases.WithUpdateDocumentData(map[string]interface{}{
-			"mpesa_receipt":  mpesaReceipt,
+	// payment_status → "paid"   matches PaymentStatus.paid in Flutter
+	// mpesa_receipt             Safaricom confirmation code
+	// amount_paid               amount confirmed by Safaricom
+	_, err = db.UpdateRow(dbID, tableID, rowID,
+		db.WithUpdateRowData(map[string]interface{}{
 			"payment_status": "paid",
+			"mpesa_receipt":  mpesaReceipt,
 			"amount_paid":    amount,
-			"notes":          description,
+			"notes":          stk.ResultDesc,
 		}),
 	)
 	if err != nil {
-		Context.Error("❌ UpdateDocument failed for " + transactionID + ": " + err.Error())
+		Context.Error("❌ UpdateRow failed for " + rowID + ": " + err.Error())
 	} else {
-		Context.Log("✅ Transaction successfully marked COMPLETED in Appwrite: " + transactionID)
+		Context.Log("✅ Transaction marked paid: " + rowID + " receipt: " + mpesaReceipt)
 	}
 
 	Context.Log("========== DARAJA CALLBACK FINISHED ==========")
 	return ack(Context)
 }
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
-
 func ack(Context openruntimes.Context) openruntimes.Response {
 	return Context.Res.Text("Success", Context.Res.WithStatusCode(200))
 }
 
-func markFailed(Context openruntimes.Context, checkoutID, reason string) error {
-	client := appwrite.NewClient(
-		appwrite.WithEndpoint(os.Getenv("APPWRITE_FUNCTION_API_ENDPOINT")),
-		appwrite.WithProject(os.Getenv("APPWRITE_FUNCTION_PROJECT_ID")),
-		appwrite.WithKey(os.Getenv("APPWRITE_API_KEY")),
-	)
-	databases := appwrite.NewDatabases(client)
-	dbID := os.Getenv("APPWRITE_DB_ID")
-	colID := os.Getenv("APPWRITE_COL_FINANCIALS")
-
-	listResp, err := databases.ListDocuments(dbID, colID,
-		databases.WithListDocumentsQueries([]string{
+func markFailed(
+	Context openruntimes.Context,
+	db *tablesdb.TablesDB,
+	dbID, tableID, checkoutID, reason string,
+) error {
+	listResp, err := db.ListRows(dbID, tableID,
+		db.WithListRowsQueries([]string{
 			query.Equal("checkout_request_id", checkoutID),
 		}),
 	)
 	if err != nil {
-		return fmt.Errorf("ListDocuments query failed: %w", err)
+		return fmt.Errorf("ListRows failed: %w", err)
 	}
 
-	var financials FinancialList
+	var financials FinancialRowList
 	if err := listResp.Decode(&financials); err != nil {
-		return fmt.Errorf("failed to decode response: %w", err)
+		return fmt.Errorf("failed to decode rows: %w", err)
 	}
 
-	if len(financials.Documents) == 0 {
-		return fmt.Errorf("no matching document found to update")
+	if len(financials.Rows) == 0 {
+		return fmt.Errorf("no row found for checkout_request_id: %s", checkoutID)
 	}
 
-	_, err = databases.UpdateDocument(dbID, colID, financials.Documents[0].Id,
-		databases.WithUpdateDocumentData(map[string]interface{}{
+	_, err = db.UpdateRow(dbID, tableID, financials.Rows[0].Id,
+		db.WithUpdateRowData(map[string]interface{}{
 			"payment_status": "failed",
-			"notes":          reason,
+			"note":           reason,
 		}),
 	)
-	if err != nil {
-		return fmt.Errorf("UpdateDocument failed: %w", err)
-	}
-
-	return nil
+	return err
 }
 
 func extractMetaString(items []struct {
