@@ -7,9 +7,9 @@ export default {
     try {
       const requestBody = await request.text();
       
-      const appwriteProjectID = "YOUR_APPWRITE_PROJECT_ID";
-      const appwriteFunctionID = "YOUR_CALLBACK_FUNCTION_ID";
-      const appwriteEndpoint = `https://cloud.appwrite.io/v1/functions/${appwriteFunctionID}/executions`;
+      const appwriteProjectID = "69a53fb00009c20573d6";
+      const appwriteFunctionID = "69a7f6ca00157f5ebd2d";
+      const appwriteEndpoint = `https://fra.cloud.appwrite.io/v1/functions/${appwriteFunctionID}/executions`;
 
       const appwriteResponse = await fetch(appwriteEndpoint, {
         method: "POST",
