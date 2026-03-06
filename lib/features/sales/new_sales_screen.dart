@@ -459,7 +459,7 @@ class _HistoryTabState extends State<_HistoryTab> {
 
         return RefreshIndicator(
           color: const Color(0xFF2D6A4F),
-          onRefresh: () async => _load(),
+          onRefresh: () { _load(); return Future.value(); },
           child: ListView(
             padding: const EdgeInsets.fromLTRB(20, 20, 20, 40),
             children: [
