@@ -1,3 +1,7 @@
 name = "mpesa-appwrite-proxy"
 main = "index.js"
 compatibility_date = "2024-03-06"
+[observability]
+[observability.logs]
+enabled = true
+invocation_logs = true

@@ -10,7 +10,7 @@ export default {
       console.log("1. Received payload from Daraja:", requestBody);
       
       // 2. Your exact IDs
-      const appwriteProjectID = "fra-69a53fb00009c20573d6"; 
+      const appwriteProjectID = "69a53fb00009c20573d6"; 
       const appwriteFunctionID = "69a7f6ca00157f5ebd2d";
       
       // 3. The actual Appwrite REST API Endpoint
