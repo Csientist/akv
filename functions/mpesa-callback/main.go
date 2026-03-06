@@ -11,8 +11,6 @@ import (
 	"github.com/open-runtimes/types-for-go/v4/openruntimes"
 )
 
-// ── Safaricom callback payload ────────────────────────────────────────────────
-
 type DarajaCallback struct {
 	Body struct {
 		StkCallback struct {
@@ -34,7 +32,7 @@ type DarajaCallback struct {
 type FinancialDoc struct {
 	*models.Document
 	CheckoutRequestID string `json:"checkout_request_id"`
-	Status            string `json:"status"`
+	PaymentStatus     string `json:"payment_status"`
 	MpesaReceipt      string `json:"mpesa_receipt"`
 }
 
@@ -43,14 +41,11 @@ type FinancialList struct {
 	Documents []FinancialDoc `json:"documents"`
 }
 
-// ── Main ──────────────────────────────────────────────────────────────────────
-
 func Main(Context openruntimes.Context) openruntimes.Response {
 	Context.Log("========== DARAJA CALLBACK INITIATED ==========")
 
-	// 1. Parse Safaricom payload
 	rawBody := Context.Req.BodyRaw()
-	Context.Log("RAW PAYLOAD: " + rawBody) // Crucial for debugging malformed Daraja JSON
+	Context.Log("RAW PAYLOAD: " + rawBody)
 
 	var payload DarajaCallback
 	if err := json.Unmarshal([]byte(rawBody), &payload); err != nil {
@@ -73,7 +68,7 @@ func Main(Context openruntimes.Context) openruntimes.Response {
 		if err != nil {
 			Context.Error("❌ Failed to update DB with FAILED status: " + err.Error())
 		} else {
-			Context.Log("✅ Transaction successfully marked as FAILED in DB.")
+			Context.Log("✅ Transaction marked as failed.")
 		}
 		return ack(Context)
 	}
@@ -82,6 +77,7 @@ func Main(Context openruntimes.Context) openruntimes.Response {
 	mpesaReceipt := extractMetaString(stk.CallbackMetadata.Item, "MpesaReceiptNumber")
 	amount := extractMetaFloat(stk.CallbackMetadata.Item, "Amount")
 	phone := extractMetaString(stk.CallbackMetadata.Item, "PhoneNumber")
+	description := stk.ResultDesc
 
 	Context.Log(fmt.Sprintf(
 		"💰 Payment Success Extracted. Receipt: %s | Amount: %.0f | Phone: %s",
@@ -119,7 +115,7 @@ func Main(Context openruntimes.Context) openruntimes.Response {
 
 	var financials FinancialList
 	if err := listResp.Decode(&financials); err != nil {
-		Context.Error("❌ Failed to decode Appwrite documents: " + err.Error())
+		Context.Error("❌ Failed to decode rows: " + err.Error())
 		return ack(Context)
 	}
 
@@ -139,6 +135,7 @@ func Main(Context openruntimes.Context) openruntimes.Response {
 			"mpesa_receipt": mpesaReceipt,
 			"status":        "COMPLETED",
 			"amount_paid":   amount,
+			"notes":         description,
 		}),
 	)
 	if err != nil {
@@ -187,8 +184,8 @@ func markFailed(Context openruntimes.Context, checkoutID, reason string) error {
 
 	_, err = databases.UpdateDocument(dbID, colID, financials.Documents[0].Id,
 		databases.WithUpdateDocumentData(map[string]interface{}{
-			"status":      "FAILED",
-			"fail_reason": reason,
+			"payment_status": "failed",
+			"notes":          reason,
 		}),
 	)
 	if err != nil {
@@ -204,6 +201,9 @@ func extractMetaString(items []struct {
 }, name string) string {
 	for _, item := range items {
 		if item.Name == name {
+			if num, ok := item.Value.(float64); ok {
+				return fmt.Sprintf("%.0f", num)
+			}
 			return fmt.Sprintf("%v", item.Value)
 		}
 	}

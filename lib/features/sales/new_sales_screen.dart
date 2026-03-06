@@ -409,9 +409,14 @@ class _HistoryTabState extends State<_HistoryTab> {
   void initState() {
     super.initState();
     _future = _repo.getRecentFinancials();
-    // Auto-refresh when an STK payment is confirmed (Realtime or poll)
-    _mpesaSub = MpesaListenerService.instance.confirmations.listen((_) {
-      if (mounted) _load();
+    // Defer subscription until after the first frame — subscribing during
+    // initState risks setState being called before the first build completes
+    // if the stream has a pending event (e.g. from the poll that just ran).
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _mpesaSub = MpesaListenerService.instance.confirmations.listen((_) {
+        if (mounted) _load();
+      });
     });
   }
 
