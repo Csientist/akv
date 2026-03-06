@@ -137,18 +137,39 @@ class SyncService {
     }
   }
 
+  /// Returns the primary key column name for a table.
+  /// This column is used as the Appwrite documentId and must NOT be
+  /// included as a field in the document body — Appwrite rejects it.
+  String _primaryKeyColumn(String tableName) {
+    switch (tableName) {
+      case 'ledger_entries':   return 'event_id';
+      case 'assets':           return 'asset_id';
+      case 'inventory':        return 'item_id';
+      case 'financials':       return 'transaction_id';
+      case 'asset_events':     return 'event_id';
+      case 'milk_logs':        return 'log_id';
+      case 'partial_payments': return 'payment_id';
+      default:                 return '';
+    }
+  }
+
   // ── Sanitization ───────────────────────────────────────────────────────────
 
   Map<String, dynamic> _sanitizeForAppwrite(
       Map<String, dynamic> data, String tableName) {
-    final out = <String, dynamic>{};
+    final out   = <String, dynamic>{};
+    final pkCol = _primaryKeyColumn(tableName);
 
     for (final entry in data.entries) {
       final key = entry.key;
       var   val = entry.value;
 
-      // Strip SQLite-internal fields Appwrite doesn't want in the document body
+      // Strip SQLite-internal fields Appwrite doesn't want in the document body.
+      // For partial_payments, also strip payment_id — it is used as the documentId
+      // but is NOT declared as a collection attribute (unlike other tables where
+      // the PK column IS declared as an attribute and must be included in the body).
       if (key == 'id' || key == 'queue_id') continue;
+      if (key == pkCol && tableName == 'partial_payments') continue;
 
       // SQLite stores booleans as 0/1 integers — Appwrite needs true/false
       if (key == 'is_kra_certified') {
