@@ -5,24 +5,21 @@ export default {
     }
 
     try {
-      // 1. Grab payload from Safaricom
       const requestBody = await request.text();
       console.log("1. Received payload from Daraja:", requestBody);
       
       // 2. Your exact IDs
       const appwriteProjectID = "69a53fb00009c20573d6"; 
       const appwriteFunctionID = "69a7f6ca00157f5ebd2d";
-      
-      // 3. The actual Appwrite REST API Endpoint
-      const appwriteEndpoint = `https://cloud.appwrite.io/v1/functions/${appwriteFunctionID}/executions`;
+      const appwriteEndpoint = `https://fra.cloud.appwrite.io/v1/functions/${appwriteFunctionID}/executions`;
       console.log("2. Forwarding to:", appwriteEndpoint);
 
-      // 4. Send to Appwrite
       const appwriteResponse = await fetch(appwriteEndpoint, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           "X-Appwrite-Project": appwriteProjectID,
+          "X-Appwrite-Key": env.APPWRITE_API_KEY 
         },
         body: JSON.stringify({
           body: requestBody,
@@ -33,7 +30,7 @@ export default {
       });
 
       const responseText = await appwriteResponse.text();
-      console.log(`3. Appwrite Response (${appwriteResponse.status}):`, responseText);
+      console.log(`Appwrite Response (${appwriteResponse.status}):`, responseText);
 
       // 5. Tell Safaricom we received it
       return new Response(JSON.stringify({ "ResultCode": 0, "ResultDesc": "Success" }), { 
