@@ -1,8 +1,10 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:uuid/uuid.dart';
 import '../../data/models/ledger_entry.dart';
 import '../../data/repositories/ledger_repository.dart';
+import '../../services/app_refresh_service.dart';
 import '../../services/session_manager.dart';
 
 
@@ -15,18 +17,30 @@ class InventoryScreen extends StatefulWidget {
 class _InventoryScreenState extends State<InventoryScreen> {
   final _repo = LedgerRepository();
   late Future<List<InventoryItem>> _future;
-  InventoryCategory? _filter; // null = show all
+  InventoryCategory? _filter;
+  StreamSubscription<void>? _refreshSub;
 
   @override
   void initState() {
     super.initState();
-    _load();
+    _future = _repo.getAllInventory();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _refreshSub = AppRefreshService.instance.ticks.listen((_) {
+        if (mounted) _load();
+      });
+    });
   }
 
   void _load() {
-    setState(() {
-      _future = _repo.getAllInventory();
-    });
+    final next = _repo.getAllInventory();
+    setState(() => _future = next);
+  }
+
+  @override
+  void dispose() {
+    _refreshSub?.cancel();
+    super.dispose();
   }
 
   @override

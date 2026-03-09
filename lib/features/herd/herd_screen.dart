@@ -1,10 +1,11 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:uuid/uuid.dart';
 import '../../data/models/ledger_entry.dart';
 import '../../data/repositories/ledger_repository.dart';
+import '../../services/app_refresh_service.dart';
 import '../../services/session_manager.dart';
-import '../../shared/app_widgets.dart';
 
 class HerdManagementScreen extends StatefulWidget {
   const HerdManagementScreen({super.key});
@@ -18,21 +19,37 @@ class _HerdManagementScreenState extends State<HerdManagementScreen>
   late TabController _tabController;
   late Future<List<Asset>> _livestockFuture;
   late Future<List<Asset>> _cropFuture;
+  StreamSubscription<void>? _refreshSub;
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
-    _refresh();
+    _livestockFuture = _repo.getActiveAssets(AssetCategory.livestock);
+    _cropFuture = _repo.getActiveAssets(AssetCategory.crop);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _refreshSub = AppRefreshService.instance.ticks.listen((_) {
+        if (mounted) _refresh();
+      });
+    });
   }
 
   @override
-  void dispose() { _tabController.dispose(); super.dispose(); }
+  void dispose() {
+    _tabController.dispose();
+    _refreshSub?.cancel();
+    super.dispose();
+  }
 
-  void _refresh() => setState(() {
-    _livestockFuture = _repo.getActiveAssets(AssetCategory.livestock);
-    _cropFuture = _repo.getActiveAssets(AssetCategory.crop);
-  });
+  void _refresh() {
+    final livestock = _repo.getActiveAssets(AssetCategory.livestock);
+    final crop      = _repo.getActiveAssets(AssetCategory.crop);
+    setState(() {
+      _livestockFuture = livestock;
+      _cropFuture      = crop;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -117,7 +134,7 @@ class _AssetList extends StatelessWidget {
           children: [
             _SummaryBanner(assets: assets, category: category),
             const SizedBox(height: 20),
-            const SectionLabel('Animals'),
+            const _SectionLabel('Animals'),
             const SizedBox(height: 10),
             if (assets.isEmpty)
               _EmptyState(category: category)
@@ -379,7 +396,7 @@ class _AnimalDetailSheetState extends State<_AnimalDetailSheet> {
             const SizedBox(height: 24),
 
             // Event timeline
-            const SectionLabel('Activity Timeline'),
+            const _SectionLabel('Activity Timeline'),
             const SizedBox(height: 12),
             FutureBuilder<List<AssetEvent>>(
               future: _eventsFuture,
@@ -769,7 +786,7 @@ class _LogEventSheetState extends State<_LogEventSheet> {
         const SizedBox(height: 20),
 
         // Event type grid
-        const SectionLabel('Activity Type'),
+        const _SectionLabel('Activity Type'),
         const SizedBox(height: 10),
         Wrap(
           spacing: 8, runSpacing: 8,
@@ -1063,6 +1080,15 @@ class _AddAssetSheetState extends State<_AddAssetSheet> {
 }
 
 // ── Shared Widgets ────────────────────────────────────────────────────────────
+
+class _SectionLabel extends StatelessWidget {
+  final String text;
+  const _SectionLabel(this.text);
+  @override
+  Widget build(BuildContext context) => Text(text.toUpperCase(),
+      style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: Color(0xFF2D6A4F), letterSpacing: 1.6));
+}
+
 class _EmptyState extends StatelessWidget {
   final AssetCategory category;
   const _EmptyState({required this.category});

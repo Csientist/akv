@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../services/app_refresh_service.dart';
 import '../../services/mpesa_listener_service.dart';
 import '../../services/pin_service.dart';
 import '../../services/session_manager.dart';
@@ -47,6 +48,7 @@ class _AuthGateState extends State<AuthGate> {
   void _onPinSet()   => setState(() => _state = _AuthState.unlocked);
   void _onUnlocked() {
     MpesaListenerService.instance.start();
+    AppRefreshService.instance.start();
     setState(() => _state = _AuthState.unlocked);
   }
 

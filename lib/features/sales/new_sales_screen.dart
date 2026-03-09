@@ -4,6 +4,7 @@ import 'dart:async';
 import 'package:uuid/uuid.dart';
 import '../../data/models/ledger_entry.dart';
 import '../../data/repositories/ledger_repository.dart';
+import '../../services/app_refresh_service.dart';
 import '../../services/mpesa_listener_service.dart';
 import '../../services/session_manager.dart';
 import '../../shared/app_widgets.dart';
@@ -713,6 +714,7 @@ class _RecordPaymentSheetState extends State<_RecordPaymentSheet> {
       if (mounted) {
         Navigator.pop(context);
         widget.onSaved();
+        AppRefreshService.instance.nudge(); // refresh dashboard + other screens immediately
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
           content: Text(
               'KES ${amount.toStringAsFixed(0)} payment recorded ✓'),

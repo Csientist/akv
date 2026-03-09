@@ -1,9 +1,9 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../data/models/ledger_entry.dart';
 import '../../data/repositories/ledger_repository.dart';
-import 'sync_debug_sheet.dart'; 
-import '../../shared/app_widgets.dart';
-
+import '../../services/app_refresh_service.dart';
+import 'sync_debug_sheet.dart';
 
 
 class DashboardScreen extends StatefulWidget {
@@ -15,17 +15,29 @@ class DashboardScreen extends StatefulWidget {
 class _DashboardScreenState extends State<DashboardScreen> {
   final _repo = LedgerRepository();
   late Future<DashboardSummary> _future;
+  StreamSubscription<void>? _refreshSub;
 
   @override
   void initState() {
     super.initState();
-    _load();
+    _future = _repo.getDashboardSummary();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _refreshSub = AppRefreshService.instance.ticks.listen((_) {
+        if (mounted) _load();
+      });
+    });
+  }
+
+  @override
+  void dispose() {
+    _refreshSub?.cancel();
+    super.dispose();
   }
 
   void _load() {
-    setState(() {
-      _future = _repo.getDashboardSummary();
-    });
+    final next = _repo.getDashboardSummary();
+    setState(() => _future = next);
   }
   @override
   Widget build(BuildContext context) {
@@ -75,7 +87,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
           return RefreshIndicator(
             color: const Color(0xFF2D6A4F),
-            onRefresh: () async => _load(),
+            onRefresh: () { _load(); return Future.value(); },
             child: ListView(
               padding: const EdgeInsets.fromLTRB(20, 16, 20, 40),
               children: [
@@ -88,7 +100,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 const SizedBox(height: 20),
 
                 // ── Quick Stats Grid ─────────────────────────────────────
-                const SectionLabel('Quick Stats'),
+                const _SectionLabel('Quick Stats'),
                 const SizedBox(height: 12),
                 GridView.count(
                   shrinkWrap: true,
@@ -132,7 +144,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 const SizedBox(height: 24),
 
                 // ── Recent Activity ──────────────────────────────────────
-                const SectionLabel('Recent Activity'),
+                const _SectionLabel('Recent Activity'),
                 const SizedBox(height: 12),
                 if (s.recentTransactions.isEmpty)
                   _EmptyActivity()
@@ -486,4 +498,15 @@ class _EmptyActivity extends StatelessWidget {
               textAlign: TextAlign.center),
         ]),
       );
+}
+
+// ── Shared Widgets ────────────────────────────────────────────────────────────
+
+class _SectionLabel extends StatelessWidget {
+  final String text;
+  const _SectionLabel(this.text);
+  @override
+  Widget build(BuildContext context) => Text(text.toUpperCase(),
+      style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w700,
+          color: Color(0xFF2D6A4F), letterSpacing: 1.6));
 }
