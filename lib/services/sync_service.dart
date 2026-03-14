@@ -1,9 +1,9 @@
+import '../core/logger.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import '../core/local_db.dart';
 import '../core/appwrite_client.dart';
 import 'pin_service.dart';
-import '../core/logger.dart';
-
+import 'image_sync_service.dart';
 
 class SyncService {
   final LocalDb _db;
@@ -27,7 +27,7 @@ class SyncService {
     // Gate 1: Connectivity
     final connectivityResults = await Connectivity().checkConnectivity();
     if (connectivityResults.contains(ConnectivityResult.none)) {
-      Log.e('[Sync] Offline — will retry when connected.');
+      Log.w('[Sync] Offline — will retry when connected.');
       return;
     }
 
@@ -35,7 +35,7 @@ class SyncService {
     // Without this, every record would get a 401 and burn through retries.
     final hasSession = await PinService.instance.hasSession();
     if (!hasSession) {
-      Log.e('[Sync] No Appwrite session — skipping until user logs in.');
+      Log.w('[Sync] No Appwrite session — skipping until user logs in.');
       return;
     }
 
@@ -53,6 +53,8 @@ class SyncService {
       for (final item in queue) {
         await _syncItem(item);
       }
+      // Upload pending image files to Appwrite Storage
+      await ImageSyncService.instance.uploadPending();
     } catch (e, stackTrace) {
       Log.e('[Sync] Fatal error in sync loop: $e\n$stackTrace');
     } finally {
@@ -74,6 +76,21 @@ class SyncService {
       return;
     }
 
+    // asset_images rows are Storage uploads/deletes, not Database documents.
+    // ImageSyncService.uploadPending() handles CREATE — here we only handle DELETE.
+    if (tableName == 'asset_images') {
+      try {
+        // recordId for DELETE is the image_id, which equals the Appwrite file ID.
+        await ImageSyncService.instance.deleteFile(recordId);
+        await _db.removeFromQueue(queueId);
+        Log.i('[Sync] ✓ Deleted image file $recordId from Appwrite Storage');
+      } catch (e) {
+        await _db.markQueueRetry(queueId, retryCount);
+        Log.e('[Sync] ✗ Failed to delete image $recordId: $e');
+      }
+      return;
+    }
+
     try {
       final db = await _db.database;
       final rows = await db.query(
@@ -84,7 +101,7 @@ class SyncService {
       );
 
       if (rows.isEmpty) {
-        Log.i('[Sync] $recordId missing in $tableName — dropping from queue.');
+        Log.w('[Sync] $recordId missing in $tableName — dropping from queue.');
         await _db.removeFromQueue(queueId);
         return;
       }
@@ -113,12 +130,12 @@ class SyncService {
 
   String _tableToCollection(String tableName) {
     switch (tableName) {
-      case 'ledger_entries':   return AppwriteClient.colLedger;
-      case 'assets':           return AppwriteClient.colAssets;
-      case 'inventory':        return AppwriteClient.colInventory;
-      case 'financials':       return AppwriteClient.colFinancials;
-      case 'asset_events':     return AppwriteClient.colAssetEvents;
-      case 'milk_logs':        return AppwriteClient.colMilkLogs;
+      case 'ledger_entries': return AppwriteClient.colLedger;
+      case 'assets':         return AppwriteClient.colAssets;
+      case 'inventory':      return AppwriteClient.colInventory;
+      case 'financials':     return AppwriteClient.colFinancials;
+      case 'asset_events':   return AppwriteClient.colAssetEvents;
+      case 'milk_logs':      return AppwriteClient.colMilkLogs;
       case 'partial_payments': return AppwriteClient.colPartialPayments;
       default: throw Exception('[Sync] Unknown table: $tableName');
     }
@@ -126,30 +143,14 @@ class SyncService {
 
   String _primaryKeyWhereClause(String tableName) {
     switch (tableName) {
-      case 'ledger_entries':   return 'event_id = ?';
-      case 'assets':           return 'asset_id = ?';
-      case 'inventory':        return 'item_id = ?';
-      case 'financials':       return 'transaction_id = ?';
-      case 'asset_events':     return 'event_id = ?';
-      case 'milk_logs':        return 'log_id = ?';
+      case 'ledger_entries': return 'event_id = ?';
+      case 'assets':         return 'asset_id = ?';
+      case 'inventory':      return 'item_id = ?';
+      case 'financials':     return 'transaction_id = ?';
+      case 'asset_events':   return 'event_id = ?';
+      case 'milk_logs':      return 'log_id = ?';
       case 'partial_payments': return 'payment_id = ?';
       default: throw Exception('[Sync] Unknown table: $tableName');
-    }
-  }
-
-  /// Returns the primary key column name for a table.
-  /// This column is used as the Appwrite documentId and must NOT be
-  /// included as a field in the document body — Appwrite rejects it.
-  String _primaryKeyColumn(String tableName) {
-    switch (tableName) {
-      case 'ledger_entries':   return 'event_id';
-      case 'assets':           return 'asset_id';
-      case 'inventory':        return 'item_id';
-      case 'financials':       return 'transaction_id';
-      case 'asset_events':     return 'event_id';
-      case 'milk_logs':        return 'log_id';
-      case 'partial_payments': return 'payment_id';
-      default:                 return '';
     }
   }
 
@@ -157,19 +158,14 @@ class SyncService {
 
   Map<String, dynamic> _sanitizeForAppwrite(
       Map<String, dynamic> data, String tableName) {
-    final out   = <String, dynamic>{};
-    final pkCol = _primaryKeyColumn(tableName);
+    final out = <String, dynamic>{};
 
     for (final entry in data.entries) {
       final key = entry.key;
       var   val = entry.value;
 
-      // Strip SQLite-internal fields Appwrite doesn't want in the document body.
-      // For partial_payments, also strip payment_id — it is used as the documentId
-      // but is NOT declared as a collection attribute (unlike other tables where
-      // the PK column IS declared as an attribute and must be included in the body).
+      // Strip SQLite-internal fields Appwrite doesn't want in the document body
       if (key == 'id' || key == 'queue_id') continue;
-      if (key == pkCol && tableName == 'partial_payments') continue;
 
       // SQLite stores booleans as 0/1 integers — Appwrite needs true/false
       if (key == 'is_kra_certified') {

@@ -1,25 +1,20 @@
 import 'package:appwrite/appwrite.dart';
-import '../core/logger.dart';
-
+import 'logger.dart';
 
 class AppwriteClient {
   static final AppwriteClient instance = AppwriteClient._internal();
   AppwriteClient._internal();
 
-  late final Client client;
+  late final Client client; // Renamed from _client so AuthService can access it
   late final Databases databases;
-  late final Account account;
+  late final Account account; // ADDED BACK: Crucial for your LoginScreen to work!
   late final Functions functions;
   late final Realtime realtime;
 
   // ── Replace these with your Appwrite project values ──────────────────────
-  static const _endpoint   = 'https://fra.cloud.appwrite.io/v1';
-  static const _projectId  = '69a53fb00009c20573d6';
-  static const _databaseId = '69a6d9c9002f3a1c4d7a';
-
-  /// Exposed so services (e.g. MpesaListenerService) can reference it
-  /// without duplicating the constant.
-  static const databaseId = _databaseId;
+  static const _endpoint      = 'https://fra.cloud.appwrite.io/v1';
+  static const kProjectId     = '69a53fb00009c20573d6';  // k-prefix avoids clash with Client.projectId (Appwrite SDK 12+)
+  static const kDatabaseId    = '69a6d9c9002f3a1c4d7a';  // k-prefix for consistency
 
   // Collection IDs (must match Appwrite console)
   static const colLedger          = 'ledger_entries';
@@ -33,8 +28,8 @@ class AppwriteClient {
   void init() {
     client = Client()
       ..setEndpoint(_endpoint)
-      ..setProject(_projectId)
-      ..setSelfSigned(status: true); 
+      ..setProject(kProjectId)
+      ..setSelfSigned(status: true);
 
     databases = Databases(client);
     account   = Account(client);
@@ -54,7 +49,7 @@ class AppwriteClient {
       // Appwrite only updates the specific fields provided in the 'data' map,
       // preventing you from accidentally wiping out other fields changed by other users.
       await databases.updateDocument(
-        databaseId: _databaseId,
+        databaseId: kDatabaseId,
         collectionId: collectionId,
         documentId: documentId,
         data: data,
@@ -66,7 +61,7 @@ class AppwriteClient {
         // 2. Document does not exist on the server. Safe to create.
         try {
           await databases.createDocument(
-            databaseId: _databaseId,
+            databaseId: kDatabaseId,
             collectionId: collectionId,
             documentId: documentId,
             data: data,

@@ -104,7 +104,7 @@ class MpesaListenerService {
       // Subscribe to any update on the financials collection.
       // We filter to relevant events in the handler.
       _subscription = realtime.subscribe([
-        'databases.${AppwriteClient.databaseId}'
+        'databases.${AppwriteClient.kDatabaseId}'
         '.collections.${AppwriteClient.colFinancials}'
         '.documents',
       ]);
@@ -201,7 +201,7 @@ class MpesaListenerService {
   Future<void> _fetchAndApply(String transactionId, double amount) async {
     try {
       final doc = await _client.databases.getDocument(
-        databaseId:   AppwriteClient.databaseId,
+        databaseId:   AppwriteClient.kDatabaseId,
         collectionId: AppwriteClient.colFinancials,
         documentId:   transactionId,
       );
