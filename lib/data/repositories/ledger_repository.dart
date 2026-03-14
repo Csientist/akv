@@ -232,6 +232,23 @@ class LedgerRepository {
     return stamped;
   }
 
+  Future<InventoryItem> updateInventoryItem(InventoryItem item) async {
+    final db = await _db.database;
+    await db.transaction((txn) async {
+      await txn.update(
+        'inventory',
+        item.toMap(),
+        where: 'item_id = ?',
+        whereArgs: [item.itemId],
+      );
+      await _db.addToQueue(txn,
+          recordId: item.itemId,
+          tableName: 'inventory',
+          operation: 'UPDATE');
+    });
+    return item;
+  }
+
   // ── Asset Events ───────────────────────────────────────────────────────────
 
   Future<AssetEvent> saveAssetEvent(AssetEvent event) async {

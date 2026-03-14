@@ -187,12 +187,59 @@ class _ConflictsTabState extends State<_ConflictsTab> {
           Query.limit(50),
         ],
       );
-      return result.documents.map((d) => d.data).toList();
+      // Keep $id alongside data so we can delete individual docs
+      return result.documents
+          .map((d) => {...d.data, '\$id': d.$id})
+          .toList();
     } on AppwriteException catch (e) {
-      // Collection doesn't exist yet — no conflicts ever recorded
       if (e.code == 404) return [];
       rethrow;
     }
+  }
+
+  Future<void> _deleteOne(String docId) async {
+    try {
+      await AppwriteClient.instance.databases.deleteDocument(
+        databaseId:   AppwriteClient.kDatabaseId,
+        collectionId: AppwriteClient.colSyncConflicts,
+        documentId:   docId,
+      );
+    } catch (_) {}
+    setState(() => _future = _fetchConflicts());
+  }
+
+  Future<void> _clearAll(List<Map<String, dynamic>> docs) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Clear all conflicts?'),
+        content: Text(
+            'Permanently delete ${docs.length} '
+            'conflict record${docs.length > 1 ? 's' : ''} from Appwrite.'),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Cancel')),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: Colors.red),
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Clear All'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    for (final doc in docs) {
+      final id = (doc['\$id'] ?? doc['conflict_id']) as String;
+      try {
+        await AppwriteClient.instance.databases.deleteDocument(
+          databaseId:   AppwriteClient.kDatabaseId,
+          collectionId: AppwriteClient.colSyncConflicts,
+          documentId:   id,
+        );
+      } catch (_) {}
+    }
+    setState(() => _future = _fetchConflicts());
   }
 
   @override
@@ -227,38 +274,73 @@ class _ConflictsTabState extends State<_ConflictsTab> {
             ]),
           );
         }
-        return ListView.builder(
-          padding: const EdgeInsets.all(12),
-          itemCount: docs.length,
-          itemBuilder: (context, i) {
-            final doc  = docs[i];
-            final table = doc['table_name'] as String? ?? '';
-            final recId = doc['record_id'] as String? ?? '';
-            final at    = doc['conflict_at'] as String? ?? '';
-            return Card(
-              color: Colors.orange.shade50,
-              margin: const EdgeInsets.only(bottom: 8),
-              child: ListTile(
-                leading: const Icon(Icons.warning_amber_rounded,
-                    color: Colors.orange),
-                title: Text(table,
-                    style: const TextStyle(
-                        fontWeight: FontWeight.w700, fontSize: 13)),
-                subtitle: Text(
-                  recId,
-                  style: const TextStyle(fontSize: 11),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                trailing: Text(
-                  _relDate(at),
-                  style: const TextStyle(fontSize: 11, color: Colors.grey),
-                ),
-                onTap: () => _showDetail(context, doc),
+        return Column(children: [
+          // Clear all button
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+            child: Row(children: [
+              Text('${docs.length} conflict${docs.length > 1 ? 's' : ''}',
+                  style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.grey)),
+              const Spacer(),
+              TextButton.icon(
+                onPressed: () => _clearAll(docs),
+                icon: const Icon(Icons.delete_sweep_outlined,
+                    size: 16, color: Colors.red),
+                label: const Text('Clear All',
+                    style: TextStyle(color: Colors.red, fontSize: 12)),
               ),
-            );
-          },
-        );
+            ]),
+          ),
+          Expanded(
+            child: ListView.builder(
+              padding: const EdgeInsets.fromLTRB(12, 4, 12, 12),
+              itemCount: docs.length,
+              itemBuilder: (context, i) {
+                final doc   = docs[i];
+                final docId = (doc['\$id'] ?? doc['conflict_id']) as String;
+                final table = doc['table_name'] as String? ?? '';
+                final recId = doc['record_id']  as String? ?? '';
+                final at    = doc['conflict_at'] as String? ?? '';
+                return Dismissible(
+                  key: ValueKey(docId),
+                  direction: DismissDirection.endToStart,
+                  background: Container(
+                    alignment: Alignment.centerRight,
+                    padding: const EdgeInsets.only(right: 16),
+                    decoration: BoxDecoration(
+                      color: Colors.red.shade100,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Icon(Icons.delete_outline, color: Colors.red),
+                  ),
+                  onDismissed: (_) => _deleteOne(docId),
+                  child: Card(
+                    color: Colors.orange.shade50,
+                    margin: const EdgeInsets.only(bottom: 8),
+                    child: ListTile(
+                      leading: const Icon(Icons.warning_amber_rounded,
+                          color: Colors.orange),
+                      title: Text(table,
+                          style: const TextStyle(
+                              fontWeight: FontWeight.w700, fontSize: 13)),
+                      subtitle: Text(recId,
+                          style: const TextStyle(fontSize: 11),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis),
+                      trailing: Text(_relDate(at),
+                          style: const TextStyle(
+                              fontSize: 11, color: Colors.grey)),
+                      onTap: () => _showDetail(context, doc),
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+        ]);
       },
     );
   }

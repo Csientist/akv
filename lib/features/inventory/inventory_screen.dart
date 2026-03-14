@@ -97,6 +97,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
                 else
                   ...displayed.map((item) => _InventoryCard(
                         item: item,
+                        onEdit: () => _showEditSheet(item),
                         onAdjust: (delta) {
                           _repo.adjustInventory(item: item, delta: delta).then((_) {
                             if (mounted) _load();
@@ -126,6 +127,21 @@ class _InventoryScreenState extends State<InventoryScreen> {
       builder: (_) => _AddInventorySheet(
         onSaved: (item) async {
           await _repo.addInventoryItem(item);
+          _load();
+        },
+      ),
+    );
+  }
+
+  void _showEditSheet(InventoryItem item) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _AddInventorySheet(
+        existing: item,
+        onSaved: (updated) async {
+          await _repo.updateInventoryItem(updated);
           _load();
         },
       ),
@@ -234,7 +250,12 @@ class _Chip extends StatelessWidget {
 class _InventoryCard extends StatelessWidget {
   final InventoryItem item;
   final void Function(double delta) onAdjust;
-  const _InventoryCard({required this.item, required this.onAdjust});
+  final VoidCallback onEdit;
+  const _InventoryCard({
+    required this.item,
+    required this.onAdjust,
+    required this.onEdit,
+  });
 
   static const _catColors = {
     InventoryCategory.feed:      Color(0xFF2D6A4F),
@@ -268,6 +289,19 @@ class _InventoryCard extends StatelessWidget {
                   style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: catColor, letterSpacing: 0.3)),
             ),
             const Spacer(),
+            // Edit button
+            GestureDetector(
+              onTap: onEdit,
+              child: Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF1F8F6),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(Icons.edit_outlined, size: 14, color: Color(0xFF52796F)),
+              ),
+            ),
+            const SizedBox(width: 8),
             // Quantity + unit
             Text(
               '${item.quantity % 1 == 0 ? item.quantity.toInt() : item.quantity.toStringAsFixed(1)} ${item.unit.name}',
@@ -390,27 +424,51 @@ class _EmptyState extends StatelessWidget {
 // ── Add Inventory Sheet ───────────────────────────────────────────────────────
 
 class _AddInventorySheet extends StatefulWidget {
+  final InventoryItem? existing;
   final Future<void> Function(InventoryItem) onSaved;
-  const _AddInventorySheet({required this.onSaved});
+  const _AddInventorySheet({this.existing, required this.onSaved});
   @override
   State<_AddInventorySheet> createState() => _AddInventorySheetState();
 }
 
 class _AddInventorySheetState extends State<_AddInventorySheet> {
   final _formKey = GlobalKey<FormState>();
-  final _nameCtrl     = TextEditingController();
-  final _qtyCtrl      = TextEditingController();
-  final _reorderCtrl  = TextEditingController();
-  final _notesCtrl    = TextEditingController();
+  late final TextEditingController _nameCtrl;
+  late final TextEditingController _qtyCtrl;
+  late final TextEditingController _reorderCtrl;
+  late final TextEditingController _notesCtrl;
   final userId = SessionManager.instance.currentUserId;
 
-  InventoryCategory _category = InventoryCategory.feed;
-  InventoryUnit _unit = InventoryUnit.kg;
+  late InventoryCategory _category;
+  late InventoryUnit _unit;
   bool _saving = false;
+
+  bool get _isEdit => widget.existing != null;
+
+  @override
+  void initState() {
+    super.initState();
+    final e = widget.existing;
+    _nameCtrl    = TextEditingController(text: e?.itemName ?? '');
+    _qtyCtrl     = TextEditingController(
+        text: e != null
+            ? (e.quantity % 1 == 0
+                ? e.quantity.toInt().toString()
+                : e.quantity.toStringAsFixed(2))
+            : '');
+    _reorderCtrl = TextEditingController(
+        text: e != null && e.reorderLevel > 0
+            ? e.reorderLevel.toStringAsFixed(0)
+            : '');
+    _notesCtrl   = TextEditingController(text: e?.notes ?? '');
+    _category    = e?.category ?? InventoryCategory.feed;
+    _unit        = e?.unit     ?? InventoryUnit.kg;
+  }
 
   @override
   void dispose() {
-    _nameCtrl.dispose(); _qtyCtrl.dispose(); _reorderCtrl.dispose(); _notesCtrl.dispose();
+    _nameCtrl.dispose(); _qtyCtrl.dispose();
+    _reorderCtrl.dispose(); _notesCtrl.dispose();
     super.dispose();
   }
 
@@ -419,15 +477,15 @@ class _AddInventorySheetState extends State<_AddInventorySheet> {
     setState(() => _saving = true);
     try {
       final item = InventoryItem(
-        itemId: const Uuid().v4(),
-        itemName: _nameCtrl.text.trim(),
-        category: _category,
-        quantity: double.parse(_qtyCtrl.text),
-        unit: _unit,
+        itemId:       widget.existing?.itemId ?? const Uuid().v4(),
+        itemName:     _nameCtrl.text.trim(),
+        category:     _category,
+        quantity:     double.parse(_qtyCtrl.text),
+        unit:         _unit,
         reorderLevel: double.tryParse(_reorderCtrl.text) ?? 0.0,
-        notes: _notesCtrl.text.trim().isNotEmpty ? _notesCtrl.text.trim() : null,
-        createdBy: userId,
-        createdAt: DateTime.now(),
+        notes:        _notesCtrl.text.trim().isNotEmpty ? _notesCtrl.text.trim() : null,
+        createdBy:    widget.existing?.createdBy ?? userId,
+        createdAt:    widget.existing?.createdAt ?? DateTime.now(),
       );
       await widget.onSaved(item);
       if (mounted) Navigator.pop(context);
@@ -447,7 +505,10 @@ class _AddInventorySheetState extends State<_AddInventorySheet> {
           child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
             Center(child: Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.grey.shade300, borderRadius: BorderRadius.circular(2)))),
             const SizedBox(height: 16),
-            const Text('Add Inventory Item', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
+            Text(
+              _isEdit ? 'Edit Item' : 'Add Inventory Item',
+              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+            ),
             const SizedBox(height: 20),
 
             TextFormField(
@@ -526,7 +587,8 @@ class _AddInventorySheetState extends State<_AddInventorySheet> {
               ),
               child: _saving
                   ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5))
-                  : const Text('Save Item', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
+                  : Text(_isEdit ? 'Save Changes' : 'Save Item',
+                      style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
             ),
             const SizedBox(height: 8),
           ]),

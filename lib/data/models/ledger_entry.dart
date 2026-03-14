@@ -276,15 +276,23 @@ class InventoryItem {
         createdAt:    DateTime.parse(map['created_at'] as String),
       );
 
-  InventoryItem copyWith({double? quantity, String? createdBy}) => InventoryItem(
+  InventoryItem copyWith({
+    String?           itemName,
+    InventoryCategory? category,
+    double?           quantity,
+    InventoryUnit?    unit,
+    double?           reorderLevel,
+    String?           notes,
+    String?           createdBy,
+  }) => InventoryItem(
         itemId:       itemId,
-        itemName:     itemName,
-        category:     category,
-        quantity:     quantity   ?? this.quantity,
-        unit:         unit,
-        reorderLevel: reorderLevel,
-        notes:        notes,
-        createdBy:    createdBy  ?? this.createdBy,
+        itemName:     itemName     ?? this.itemName,
+        category:     category     ?? this.category,
+        quantity:     quantity     ?? this.quantity,
+        unit:         unit         ?? this.unit,
+        reorderLevel: reorderLevel ?? this.reorderLevel,
+        notes:        notes        ?? this.notes,
+        createdBy:    createdBy    ?? this.createdBy,
         createdAt:    createdAt,
       );
 }

@@ -207,14 +207,7 @@ class _AnimalCard extends StatelessWidget {
         child: Padding(
           padding: const EdgeInsets.all(14),
           child: Row(children: [
-            Container(
-              width: 48, height: 48,
-              decoration: BoxDecoration(color: const Color(0xFFD8F3DC), borderRadius: BorderRadius.circular(14)),
-              child: Center(child: Text(
-                asset.tagName.isNotEmpty ? asset.tagName[0].toUpperCase() : '?',
-                style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFF2D6A4F)),
-              )),
-            ),
+            _AssetThumbnail(assetId: asset.assetId, tagName: asset.tagName, size: 48),
             const SizedBox(width: 14),
             Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Row(children: [
@@ -367,10 +360,7 @@ class _AnimalDetailSheetState extends State<_AnimalDetailSheet> {
 
             // Header
             Row(children: [
-              Container(width: 56, height: 56,
-                  decoration: BoxDecoration(color: const Color(0xFFD8F3DC), borderRadius: BorderRadius.circular(16)),
-                  child: Center(child: Text(a.tagName.isNotEmpty ? a.tagName[0].toUpperCase() : '?',
-                      style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Color(0xFF2D6A4F))))),
+              _AssetThumbnail(assetId: a.assetId, tagName: a.tagName, size: 56),
               const SizedBox(width: 14),
               Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 Text(a.tagName.isNotEmpty ? a.tagName : 'Unnamed',
@@ -1145,6 +1135,60 @@ class _AddAssetSheetState extends State<_AddAssetSheet> {
           const SizedBox(height: 8),
         ])),
       ),
+    );
+  }
+}
+
+// ── Asset Thumbnail ───────────────────────────────────────────────────────────
+// Shows the first photo for an asset, falling back to a letter avatar.
+// Uses FutureBuilder so the card renders immediately and the image loads async.
+
+class _AssetThumbnail extends StatelessWidget {
+  final String assetId;
+  final String tagName;
+  final double size;
+  const _AssetThumbnail({
+    required this.assetId,
+    required this.tagName,
+    required this.size,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<List<FarmImage>>(
+      future: ImageService.instance.getImages(
+        entityType: ImageEntityType.asset,
+        entityId:   assetId,
+      ),
+      builder: (context, snap) {
+        final first = snap.data?.isNotEmpty == true ? snap.data!.first : null;
+        if (first != null) {
+          return AssetImageWidget(
+            image:        first,
+            size:         size,
+            borderRadius: BorderRadius.circular(size * 0.28),
+          );
+        }
+        // Fallback — letter avatar
+        return Container(
+          width:  size,
+          height: size,
+          decoration: BoxDecoration(
+            color:        const Color(0xFFD8F3DC),
+            borderRadius: BorderRadius.circular(size * 0.28),
+          ),
+          child: Center(
+            child: Text(
+              tagName.isNotEmpty ? tagName[0].toUpperCase() : '?',
+              style: TextStyle(
+                fontSize:   size * 0.40,
+                fontWeight: FontWeight.bold,
+                color:      const Color(0xFF2D6A4F),
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 }

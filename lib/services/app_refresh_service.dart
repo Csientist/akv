@@ -28,7 +28,7 @@ class AppRefreshService with WidgetsBindingObserver {
   static final AppRefreshService instance = AppRefreshService._internal();
   AppRefreshService._internal();
 
-  static const interval = Duration(seconds: 60);
+  static const interval = Duration(seconds: 1000);
 
   final _controller = StreamController<void>.broadcast();
   Stream<void> get ticks => _controller.stream;
