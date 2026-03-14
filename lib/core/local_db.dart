@@ -176,6 +176,16 @@ class LocalDb {
       )
     ''');
 
+    // ── Sync Meta (Down-sync cursors) ─────────────────────────────────────────
+    // One row per collection; last_synced_at is an ISO 8601 UTC string.
+    // NULL means "never synced" — pull everything on first run.
+    await db.execute('''
+      CREATE TABLE sync_meta (
+        collection  TEXT PRIMARY KEY,
+        last_synced_at TEXT
+      )
+    ''');
+
     // ── Sync Queue (Transactional Outbox) ─────────────────────────────────────
     await db.execute('''
       CREATE TABLE sync_queue (
@@ -388,5 +398,31 @@ class LocalDb {
     );
   }
 
+  // ── Down-sync cursor helpers ───────────────────────────────────────────────
+
+  /// Returns the last successful down-sync timestamp for [collection],
+  /// or null if the collection has never been synced.
+  Future<String?> getLastSyncedAt(String collection) async {
+    final db = await database;
+    final rows = await db.query(
+      'sync_meta',
+      columns: ['last_synced_at'],
+      where: 'collection = ?',
+      whereArgs: [collection],
+      limit: 1,
+    );
+    if (rows.isEmpty) return null;
+    return rows.first['last_synced_at'] as String?;
+  }
+
+  /// Upserts the down-sync cursor for [collection] to [timestamp].
+  Future<void> setLastSyncedAt(String collection, String timestamp) async {
+    final db = await database;
+    await db.insert(
+      'sync_meta',
+      {'collection': collection, 'last_synced_at': timestamp},
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+  }
 
 }

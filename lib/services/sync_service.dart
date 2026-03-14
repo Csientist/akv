@@ -4,6 +4,8 @@ import '../core/local_db.dart';
 import '../core/appwrite_client.dart';
 import 'pin_service.dart';
 import 'image_sync_service.dart';
+import 'down_sync_service.dart';
+import 'session_manager.dart';
 
 class SyncService {
   final LocalDb _db;
@@ -16,11 +18,19 @@ class SyncService {
       : _db = db ?? LocalDb.instance,
         _remote = remote ?? AppwriteClient.instance;
 
-  // ── Entry point (non-blocking) ─────────────────────────────────────────────
+  // ── Entry points ───────────────────────────────────────────────────────────
 
+  /// Non-blocking up-sync only (connectivity listener trigger).
   void processQueue() {
     if (_isSyncing) return;
     _runSyncLoop();
+  }
+
+  /// Full bidirectional sync: push local changes first, then pull remote.
+  /// Call this on login/unlock and on AppRefreshService ticks.
+  Future<void> fullSync() async {
+    if (_isSyncing) return;
+    await _runSyncLoop();
   }
 
   Future<void> _runSyncLoop() async {
@@ -49,12 +59,26 @@ class SyncService {
         return;
       }
 
-      Log.i('[Sync] ${queue.length} item(s) to sync.');
-      for (final item in queue) {
-        await _syncItem(item);
+      if (queue.isNotEmpty) {
+        Log.i('[Sync] ${queue.length} item(s) to sync.');
+        for (final item in queue) {
+          await _syncItem(item);
+        }
+        // Upload pending image files to Appwrite Storage
+        await ImageSyncService.instance.uploadPending();
+      } else {
+        Log.i('[Sync] Up-sync queue empty.');
       }
-      // Upload pending image files to Appwrite Storage
-      await ImageSyncService.instance.uploadPending();
+
+      // ── Down-sync: pull remote changes into local SQLite ──────────────────
+      // Always runs — even on fresh install with empty queue.
+      // Runs after up-sync so we don't overwrite our own just-pushed records.
+      final userId = SessionManager.instance.isLoggedIn
+          ? SessionManager.instance.currentUserId
+          : null;
+      if (userId != null) {
+        await DownSyncService.instance.pullAll(userId);
+      }
     } catch (e, stackTrace) {
       Log.e('[Sync] Fatal error in sync loop: $e\n$stackTrace');
     } finally {

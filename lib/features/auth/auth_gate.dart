@@ -3,6 +3,7 @@ import '../../services/app_refresh_service.dart';
 import '../../services/mpesa_listener_service.dart';
 import '../../services/pin_service.dart';
 import '../../services/session_manager.dart';
+import '../../services/sync_service.dart';
 import 'login_screen.dart';
 import 'pin_screens.dart';
 
@@ -49,6 +50,9 @@ class _AuthGateState extends State<AuthGate> {
   void _onUnlocked() {
     MpesaListenerService.instance.start();
     AppRefreshService.instance.start();
+    // Immediately pull cloud data so fresh installs see their records at once.
+    // Fire-and-forget — the UI will refresh via AppRefreshService ticks.
+    SyncService().fullSync();
     setState(() => _state = _AuthState.unlocked);
   }
 

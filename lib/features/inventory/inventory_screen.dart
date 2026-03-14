@@ -34,7 +34,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
 
   void _load() {
     final next = _repo.getAllInventory();
-    setState(() => _future = next);
+    if (mounted) setState(() => _future = next);
   }
 
   @override

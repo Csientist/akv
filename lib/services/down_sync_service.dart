@@ -1,0 +1,270 @@
+import 'dart:convert';
+import 'package:appwrite/appwrite.dart';
+import 'package:sqflite/sqflite.dart';
+import 'package:uuid/uuid.dart';
+import '../core/appwrite_client.dart';
+import '../core/local_db.dart';
+import '../core/logger.dart';
+
+/// Pulls records from every Appwrite collection into local SQLite.
+///
+/// Strategy:
+///   - Cursor-based: stores last_synced_at per collection in sync_meta table.
+///   - On first run (null cursor) pulls ALL records for the user.
+///   - On subsequent runs pulls only records newer than the cursor.
+///   - Conflict resolution: Appwrite wins — remote overwrites local.
+///   - Conflicts are written to the sync_conflicts Appwrite DB collection
+///     so they can be reviewed in the SyncDebugSheet without needing Storage.
+///   - Paginated: 100 records per page.
+class DownSyncService {
+  static final DownSyncService instance = DownSyncService._();
+  DownSyncService._();
+
+  static const int _pageSize = 100;
+  static const _uuid = Uuid();
+
+  // Collections in dependency order (parents before children)
+  static const List<_CollectionConfig> _collections = [
+    _CollectionConfig(
+      collection: AppwriteClient.colLedger,
+      table:      'ledger_entries',
+      primaryKey: 'event_id',
+    ),
+    _CollectionConfig(
+      collection: AppwriteClient.colAssets,
+      table:      'assets',
+      primaryKey: 'asset_id',
+    ),
+    _CollectionConfig(
+      collection: AppwriteClient.colInventory,
+      table:      'inventory',
+      primaryKey: 'item_id',
+    ),
+    _CollectionConfig(
+      collection: AppwriteClient.colFinancials,
+      table:      'financials',
+      primaryKey: 'transaction_id',
+    ),
+    _CollectionConfig(
+      collection: AppwriteClient.colPartialPayments,
+      table:      'partial_payments',
+      primaryKey: 'payment_id',
+    ),
+    _CollectionConfig(
+      collection: AppwriteClient.colAssetEvents,
+      table:      'asset_events',
+      primaryKey: 'event_id',
+    ),
+    _CollectionConfig(
+      collection: AppwriteClient.colMilkLogs,
+      table:      'milk_logs',
+      primaryKey: 'log_id',
+    ),
+  ];
+
+  // ── Public API ──────────────────────────────────────────────────────────────
+
+  Future<int> pullAll(String userId) async {
+    int totalWritten   = 0;
+    int totalConflicts = 0;
+    final pullStartedAt = DateTime.now().toUtc().toIso8601String();
+
+    for (final cfg in _collections) {
+      try {
+        final result = await _pullCollection(cfg, userId);
+        totalWritten   += result.written;
+        totalConflicts += result.conflicts;
+      } catch (e) {
+        Log.e('[DownSync] Failed to pull ${cfg.table}: $e');
+      }
+    }
+
+    Log.i('[DownSync] Pull complete — '
+        '$totalWritten written, $totalConflicts conflict(s) recorded.');
+
+    // Advance ALL cursors to pull-start time so records written to Appwrite
+    // during our pull are caught on the next run.
+    for (final cfg in _collections) {
+      await LocalDb.instance.setLastSyncedAt(cfg.collection, pullStartedAt);
+    }
+
+    return totalWritten;
+  }
+
+  // ── Private ─────────────────────────────────────────────────────────────────
+
+  Future<_PullResult> _pullCollection(
+      _CollectionConfig cfg, String userId) async {
+    final cursor      = await LocalDb.instance.getLastSyncedAt(cfg.collection);
+    final isFirstSync = cursor == null;
+
+    Log.i('[DownSync] Pulling ${cfg.table} '
+        '(cursor: ${cursor ?? 'first sync'})');
+
+    final databases = AppwriteClient.instance.databases;
+    int written   = 0;
+    int conflicts = 0;
+    int offset    = 0;
+
+    while (true) {
+      final queries = <String>[
+        Query.equal('created_by', userId),
+        Query.limit(_pageSize),
+        Query.offset(offset),
+        Query.orderAsc('created_at'),
+      ];
+
+      if (!isFirstSync) {
+        queries.add(Query.greaterThan('created_at', cursor));
+      }
+
+      final result = await databases.listDocuments(
+        databaseId:   AppwriteClient.kDatabaseId,
+        collectionId: cfg.collection,
+        queries:      queries,
+      );
+
+      if (result.documents.isEmpty) break;
+
+      final db = await LocalDb.instance.database;
+
+      for (final doc in result.documents) {
+        final incoming = _documentToRow(doc.data, cfg);
+        final recordId = incoming[cfg.primaryKey] as String;
+
+        // Check for a conflict — record exists locally with different data
+        final existing = await db.query(
+          cfg.table,
+          where:     '${cfg.primaryKey} = ?',
+          whereArgs: [recordId],
+          limit:     1,
+        );
+
+        if (existing.isNotEmpty) {
+          final localRow = Map<String, dynamic>.from(existing.first);
+          if (_isDifferent(localRow, incoming)) {
+            conflicts++;
+            // Fire-and-forget — a DB write failure must not block the sync
+            _recordConflict(
+              table:     cfg.table,
+              recordId:  recordId,
+              localRow:  localRow,
+              remoteRow: incoming,
+              userId:    userId,
+            ).catchError((e) {
+              Log.e('[DownSync] Conflict record failed for $recordId: $e');
+            });
+            Log.w('[DownSync] Conflict on ${cfg.table}/$recordId — '
+                'Appwrite wins, conflict logged.');
+          }
+        }
+
+        // Upsert — Appwrite always wins
+        await db.insert(
+          cfg.table,
+          incoming,
+          conflictAlgorithm: ConflictAlgorithm.replace,
+        );
+        written++;
+      }
+
+      Log.i('[DownSync] ${cfg.table}: wrote ${result.documents.length} '
+          'record(s) (offset $offset)');
+
+      if (result.documents.length < _pageSize) break;
+      offset += _pageSize;
+    }
+
+    return _PullResult(written: written, conflicts: conflicts);
+  }
+
+  // ── Conflict recording ──────────────────────────────────────────────────────
+
+  Future<void> _recordConflict({
+    required String table,
+    required String recordId,
+    required Map<String, dynamic> localRow,
+    required Map<String, dynamic> remoteRow,
+    required String userId,
+  }) async {
+    final now = DateTime.now().toUtc();
+
+    // Build a field-by-field diff — only changed fields
+    final diffFields = <String, dynamic>{};
+    final allKeys = {...localRow.keys, ...remoteRow.keys};
+    for (final key in allKeys) {
+      final lv = localRow[key];
+      final rv = remoteRow[key];
+      if (lv?.toString() != rv?.toString()) {
+        // Store as JSON string — Appwrite free tier doesn't support nested objects
+        diffFields[key] = jsonEncode({'local': lv, 'remote': rv});
+      }
+    }
+
+    final conflictId = _uuid.v4();
+
+    await AppwriteClient.instance.databases.createDocument(
+      databaseId:   AppwriteClient.kDatabaseId,
+      collectionId: AppwriteClient.colSyncConflicts,
+      documentId:   conflictId,
+      data: {
+        'conflict_id':  conflictId,
+        'table_name':   table,
+        'record_id':    recordId,
+        'user_id':      userId,
+        'resolution':   'appwrite_wins',
+        'diff_json':    jsonEncode(diffFields),  // full diff as JSON string
+        'local_json':   jsonEncode(localRow),    // full local snapshot
+        'remote_json':  jsonEncode(remoteRow),   // full remote snapshot
+        'conflict_at':  now.toIso8601String(),
+        'created_by':   userId,
+        'created_at':   now.toIso8601String(),
+      },
+    );
+
+    Log.i('[DownSync] Conflict recorded: $conflictId ($table/$recordId)');
+  }
+
+  // ── Helpers ─────────────────────────────────────────────────────────────────
+
+  bool _isDifferent(
+      Map<String, dynamic> local, Map<String, dynamic> remote) {
+    for (final key in remote.keys) {
+      if (local[key]?.toString() != remote[key]?.toString()) return true;
+    }
+    return false;
+  }
+
+  Map<String, dynamic> _documentToRow(
+      Map<String, dynamic> data, _CollectionConfig cfg) {
+    final row = <String, dynamic>{};
+    for (final entry in data.entries) {
+      final key = entry.key;
+      final val = entry.value;
+      if (key.startsWith('\$')) continue;
+      if (key == 'is_kra_certified') {
+        row[key] = (val == true) ? 1 : 0;
+        continue;
+      }
+      row[key] = val;
+    }
+    return row;
+  }
+}
+
+class _PullResult {
+  final int written;
+  final int conflicts;
+  const _PullResult({required this.written, required this.conflicts});
+}
+
+class _CollectionConfig {
+  final String collection;
+  final String table;
+  final String primaryKey;
+  const _CollectionConfig({
+    required this.collection,
+    required this.table,
+    required this.primaryKey,
+  });
+}

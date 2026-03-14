@@ -1,7 +1,8 @@
 import 'dart:async';
-import 'package:flutter/widgets.dart';
 import '../core/logger.dart';
-
+import 'package:flutter/widgets.dart';
+import 'image_service.dart';
+import 'sync_service.dart';
 
 /// Broadcasts a refresh tick every [interval] and on app foreground resume.
 /// Screens subscribe to [ticks] and call their own _load() in response.
@@ -42,6 +43,8 @@ class AppRefreshService with WidgetsBindingObserver {
     _started = true;
     WidgetsBinding.instance.addObserver(this);
     _startTimer();
+    // Evict stale cache files on startup — fire-and-forget
+    ImageService.instance.evictExpiredCache();
     Log.i('[AppRefresh] Started — ticking every ${interval.inSeconds}s.');
   }
 
@@ -51,7 +54,7 @@ class AppRefreshService with WidgetsBindingObserver {
     WidgetsBinding.instance.removeObserver(this);
     _timer?.cancel();
     _timer = null;
-    Log.i('[AppRefresh] Stopped.');
+    Log.w('[AppRefresh] Stopped.');
   }
 
   void dispose() {
@@ -91,7 +94,11 @@ class AppRefreshService with WidgetsBindingObserver {
 
   void _tick() {
     if (!_controller.isClosed) {
-      _controller.add(null);
+      // Run full bidirectional sync on every tick, then notify UI screens.
+      // fullSync() is a no-op if a sync is already in progress.
+      SyncService().fullSync().whenComplete(() {
+        if (!_controller.isClosed) _controller.add(null);
+      });
     }
   }
 }

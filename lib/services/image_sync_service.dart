@@ -13,7 +13,7 @@ class ImageSyncService {
   static final ImageSyncService instance = ImageSyncService._();
   ImageSyncService._();
 
-  static const _bucketId = 'asset-images'; // Appwrite Storage bucket ID
+  static const _bucketId = AppwriteClient.bucketAssetImages; // Appwrite Storage bucket ID
 
   // ── Upload pending images ──────────────────────────────────────────────────
 

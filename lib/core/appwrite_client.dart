@@ -24,12 +24,15 @@ class AppwriteClient {
   static const colAssetEvents     = 'asset_events';
   static const colMilkLogs        = 'milk_logs';
   static const colPartialPayments = 'partial_payments';
+  static const colSyncConflicts   = 'sync_conflicts';
+
+  // Storage bucket IDs
+  static const bucketAssetImages  = '69a8620e00386a4836be';
 
   void init() {
     client = Client()
       ..setEndpoint(_endpoint)
-      ..setProject(kProjectId)
-      ..setSelfSigned(status: true);
+      ..setProject(kProjectId);
 
     databases = Databases(client);
     account   = Account(client);

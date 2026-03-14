@@ -36,8 +36,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   void _load() {
+    // Create the future BEFORE calling setState — never put async work inside
+    // the setState callback, or Flutter will throw "returned a Future" assertion.
     final next = _repo.getDashboardSummary();
-    setState(() => _future = next);
+    if (mounted) setState(() => _future = next);
   }
   @override
   Widget build(BuildContext context) {
@@ -87,7 +89,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
           return RefreshIndicator(
             color: const Color(0xFF2D6A4F),
-            onRefresh: () { _load(); return Future.value(); },
+            onRefresh: () async {
+              final next = _repo.getDashboardSummary();
+              if (mounted) setState(() => _future = next);
+             // await next.catchError((_) {});
+            },
             child: ListView(
               padding: const EdgeInsets.fromLTRB(20, 16, 20, 40),
               children: [
