@@ -54,10 +54,6 @@ class SyncService {
 
     try {
       final queue = await _db.getPendingQueue();
-      if (queue.isEmpty) {
-        Log.i('[Sync] Queue is empty. Nothing to sync.');
-        return;
-      }
 
       if (queue.isNotEmpty) {
         Log.i('[Sync] ${queue.length} item(s) to sync.');
@@ -160,7 +156,6 @@ class SyncService {
       case 'financials':     return AppwriteClient.colFinancials;
       case 'asset_events':   return AppwriteClient.colAssetEvents;
       case 'milk_logs':      return AppwriteClient.colMilkLogs;
-      case 'partial_payments': return AppwriteClient.colPartialPayments;
       default: throw Exception('[Sync] Unknown table: $tableName');
     }
   }
@@ -173,7 +168,6 @@ class SyncService {
       case 'financials':     return 'transaction_id = ?';
       case 'asset_events':   return 'event_id = ?';
       case 'milk_logs':      return 'log_id = ?';
-      case 'partial_payments': return 'payment_id = ?';
       default: throw Exception('[Sync] Unknown table: $tableName');
     }
   }

@@ -13,8 +13,7 @@ import '../core/logger.dart';
 ///   - On first run (null cursor) pulls ALL records for the user.
 ///   - On subsequent runs pulls only records newer than the cursor.
 ///   - Conflict resolution: Appwrite wins — remote overwrites local.
-///   - Conflicts are written to the sync_conflicts Appwrite DB collection
-///     so they can be reviewed in the SyncDebugSheet without needing Storage.
+///   - Conflicts are written to the sync_conflicts Appwrite DB collection.
 ///   - Paginated: 100 records per page.
 class DownSyncService {
   static final DownSyncService instance = DownSyncService._();
@@ -128,44 +127,63 @@ class DownSyncService {
 
       final db = await LocalDb.instance.database;
 
-      for (final doc in result.documents) {
-        final incoming = _documentToRow(doc.data, cfg);
-        final recordId = incoming[cfg.primaryKey] as String;
+      // Deduplicate within the page — Appwrite can return the same document
+      // multiple times when offset-based pagination overlaps (known Appwrite bug).
+      final seenInPage = <String>{};
 
-        // Check for a conflict — record exists locally with different data
-        final existing = await db.query(
-          cfg.table,
-          where:     '${cfg.primaryKey} = ?',
-          whereArgs: [recordId],
-          limit:     1,
-        );
+      await db.execute('PRAGMA foreign_keys = OFF');
+      try {
+        for (final doc in result.documents) {
+          final incoming = _documentToRow(doc.data, cfg);
 
-        if (existing.isNotEmpty) {
-          final localRow = Map<String, dynamic>.from(existing.first);
-          if (_isDifferent(localRow, incoming)) {
-            conflicts++;
-            // Fire-and-forget — a DB write failure must not block the sync
-            _recordConflict(
-              table:     cfg.table,
-              recordId:  recordId,
-              localRow:  localRow,
-              remoteRow: incoming,
-              userId:    userId,
-            ).catchError((e) {
-              Log.e('[DownSync] Conflict record failed for $recordId: $e');
-            });
-            Log.w('[DownSync] Conflict on ${cfg.table}/$recordId — '
-                'Appwrite wins, conflict logged.');
+          final recordId = incoming[cfg.primaryKey]?.toString();
+          if (recordId == null) {
+            Log.w('[DownSync] Skipping ${cfg.table} doc — null primaryKey');
+            continue;
           }
-        }
 
-        // Upsert — Appwrite always wins
-        await db.insert(
-          cfg.table,
-          incoming,
-          conflictAlgorithm: ConflictAlgorithm.replace,
-        );
-        written++;
+          // Skip duplicate within this page
+          if (!seenInPage.add(recordId)) {
+            Log.w('[DownSync] Duplicate doc $recordId in page — skipping');
+            continue;
+          }
+
+          // Conflict check — record already exists locally with different data
+          final existing = await db.query(
+            cfg.table,
+            where:     '${cfg.primaryKey} = ?',
+            whereArgs: [recordId],
+            limit:     1,
+          );
+
+          if (existing.isNotEmpty) {
+            final localRow = Map<String, dynamic>.from(existing.first);
+            if (_isDifferent(localRow, incoming)) {
+              conflicts++;
+              _recordConflict(
+                table:     cfg.table,
+                recordId:  recordId,
+                localRow:  localRow,
+                remoteRow: incoming,
+                userId:    userId,
+              ).catchError((e) {
+                Log.e('[DownSync] Conflict record failed for $recordId: $e');
+              });
+              Log.w('[DownSync] Conflict on ${cfg.table}/$recordId — '
+                  'Appwrite wins, conflict logged.');
+            }
+          }
+
+          // Upsert — Appwrite always wins
+          await db.insert(
+            cfg.table,
+            incoming,
+            conflictAlgorithm: ConflictAlgorithm.replace,
+          );
+          written++;
+        }
+      } finally {
+        await db.execute('PRAGMA foreign_keys = ON');
       }
 
       Log.i('[DownSync] ${cfg.table}: wrote ${result.documents.length} '
@@ -189,14 +207,12 @@ class DownSyncService {
   }) async {
     final now = DateTime.now().toUtc();
 
-    // Build a field-by-field diff — only changed fields
     final diffFields = <String, dynamic>{};
     final allKeys = {...localRow.keys, ...remoteRow.keys};
     for (final key in allKeys) {
       final lv = localRow[key];
       final rv = remoteRow[key];
       if (lv?.toString() != rv?.toString()) {
-        // Store as JSON string — Appwrite free tier doesn't support nested objects
         diffFields[key] = jsonEncode({'local': lv, 'remote': rv});
       }
     }
@@ -208,17 +224,17 @@ class DownSyncService {
       collectionId: AppwriteClient.colSyncConflicts,
       documentId:   conflictId,
       data: {
-        'conflict_id':  conflictId,
-        'table_name':   table,
-        'record_id':    recordId,
-        'user_id':      userId,
-        'resolution':   'appwrite_wins',
-        'diff_json':    jsonEncode(diffFields),  // full diff as JSON string
-        'local_json':   jsonEncode(localRow),    // full local snapshot
-        'remote_json':  jsonEncode(remoteRow),   // full remote snapshot
-        'conflict_at':  now.toIso8601String(),
-        'created_by':   userId,
-        'created_at':   now.toIso8601String(),
+        'conflict_id': conflictId,
+        'table_name':  table,
+        'record_id':   recordId,
+        'user_id':     userId,
+        'resolution':  'appwrite_wins',
+        'diff_json':   jsonEncode(diffFields),
+        'local_json':  jsonEncode(localRow),
+        'remote_json': jsonEncode(remoteRow),
+        'conflict_at': now.toIso8601String(),
+        'created_by':  userId,
+        'created_at':  now.toIso8601String(),
       },
     );
 
@@ -235,17 +251,35 @@ class DownSyncService {
     return false;
   }
 
+  // Fields whose values must be lowercased to satisfy local SQLite CHECK constraints.
+  // Appwrite stores these as uppercase (MPESA, PAID, ACTIVE etc.) but local
+  // schema uses lowercase to match Dart enum .name output.
+  static const _lowercaseFields = {
+    'type', 'status', 'category', 'unit', 'session',
+    'payment_method', 'payment_status', 'transaction_type', 'method',
+    'upload_status', 'entity_type',
+  };
+
   Map<String, dynamic> _documentToRow(
       Map<String, dynamic> data, _CollectionConfig cfg) {
     final row = <String, dynamic>{};
+
     for (final entry in data.entries) {
       final key = entry.key;
-      final val = entry.value;
-      if (key.startsWith('\$')) continue;
+      var   val = entry.value;
+
+      if (key.startsWith('\$')) continue;  // Appwrite system fields
+
       if (key == 'is_kra_certified') {
         row[key] = (val == true) ? 1 : 0;
         continue;
       }
+
+      // Normalise enum strings to lowercase so they pass SQLite CHECK constraints
+      if (val is String && _lowercaseFields.contains(key)) {
+        val = val.toLowerCase();
+      }
+
       row[key] = val;
     }
     return row;

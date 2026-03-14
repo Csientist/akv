@@ -19,7 +19,7 @@ class LocalDb {
     final path = join(dbPath, 'farm_app.db');
     return await openDatabase(
       path,
-      version: 2,
+      version: 1,
       onConfigure: _onConfigure,
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
@@ -112,6 +112,7 @@ class LocalDb {
         checkout_request_id    TEXT,
         mpesa_receipt          TEXT,
         amount_paid            REAL NOT NULL DEFAULT 0.0,
+        notes                  TEXT,
         event_id               TEXT,
         created_by             TEXT NOT NULL,
         created_at             TEXT NOT NULL,
@@ -222,7 +223,7 @@ class LocalDb {
   }
 
   Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
-    if (oldVersion < 2) await _createImageTables(db);
+    // Fresh install — no migrations needed at v1.
   }
 
   Future<void> _createImageTables(Database db) async {

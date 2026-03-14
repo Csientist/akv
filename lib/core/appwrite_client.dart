@@ -27,7 +27,7 @@ class AppwriteClient {
   static const colSyncConflicts   = 'sync_conflicts';
 
   // Storage bucket IDs
-  static const bucketAssetImages  = '69a8620e00386a4836be';
+  static const bucketAssetImages  = 'asset-images';
 
   void init() {
     client = Client()

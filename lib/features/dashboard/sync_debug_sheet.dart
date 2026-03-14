@@ -241,7 +241,7 @@ class _ConflictsTabState extends State<_ConflictsTab> {
               child: ListTile(
                 leading: const Icon(Icons.warning_amber_rounded,
                     color: Colors.orange),
-                title: Text('$table',
+                title: Text(table,
                     style: const TextStyle(
                         fontWeight: FontWeight.w700, fontSize: 13)),
                 subtitle: Text(

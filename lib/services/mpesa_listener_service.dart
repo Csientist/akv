@@ -1,9 +1,9 @@
 import 'dart:async';
-import '../core/logger.dart';
 import 'package:appwrite/appwrite.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import '../core/appwrite_client.dart';
 import '../core/local_db.dart';
+import '../core/logger.dart';
 import '../services/session_manager.dart';
 
 // ── Confirmation result ────────────────────────────────────────────────────────
@@ -89,17 +89,9 @@ class MpesaListenerService {
 
   // ── Strategy 1: Appwrite Realtime ──────────────────────────────────────────
 
-  void _subscribeRealtime() async {
-    if (!await _isOnline()) {
-      Log.i('[MpesaListener] Offline — deferring Realtime subscription.');
-      // Retry when connectivity returns
-      Future.delayed(const Duration(seconds: 10), () {
-        if (_started) _subscribeRealtime();
-      });
-      return;
-    }
+  void _subscribeRealtime() {
     try {
-      final realtime = Realtime(_client.client);
+      final realtime = AppwriteClient.instance.realtime;
 
       // Subscribe to any update on the financials collection.
       // We filter to relevant events in the handler.
