@@ -429,7 +429,7 @@ class LedgerRepository {
       where: 'created_by = ?',
       whereArgs: [_uid],
       orderBy: 'created_at DESC',
-      limit: 5,
+      limit: 10,
     );
     final recentTransactions = recentRows.map(Financial.fromMap).toList();
 

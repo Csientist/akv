@@ -93,12 +93,15 @@ class AppRefreshService with WidgetsBindingObserver {
   }
 
   void _tick() {
-    if (!_controller.isClosed) {
-      // Run full bidirectional sync on every tick, then notify UI screens.
-      // fullSync() is a no-op if a sync is already in progress.
-      SyncService().fullSync().whenComplete(() {
-        if (!_controller.isClosed) _controller.add(null);
-      });
-    }
+    if (_controller.isClosed) return;
+    // Notify UI screens immediately so they reload from local SQLite.
+    // Sync runs independently in the background — screens will get another
+    // tick on the next interval with freshly pulled data.
+    _controller.add(null);
+    // Fire-and-forget — unawaited intentionally. fullSync is a no-op if
+    // already running.
+    SyncService().fullSync().catchError((e) {
+      Log.e('[AppRefresh] Background sync error: $e');
+    });
   }
 }

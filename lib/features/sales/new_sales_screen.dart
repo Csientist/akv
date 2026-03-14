@@ -404,18 +404,19 @@ class _HistoryTab extends StatefulWidget {
 class _HistoryTabState extends State<_HistoryTab> {
   final _repo = LedgerRepository();
   late Future<List<Financial>> _future;
+  StreamSubscription<void>?  _refreshSub;
   StreamSubscription<MpesaConfirmation>? _mpesaSub;
 
   @override
   void initState() {
     super.initState();
     _future = _repo.getRecentFinancials();
-    // Defer subscription until after the first frame — subscribing during
-    // initState risks setState being called before the first build completes
-    // if the stream has a pending event (e.g. from the poll that just ran).
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       _mpesaSub = MpesaListenerService.instance.confirmations.listen((_) {
+        if (mounted) _load();
+      });
+      _refreshSub = AppRefreshService.instance.ticks.listen((_) {
         if (mounted) _load();
       });
     });
@@ -424,12 +425,13 @@ class _HistoryTabState extends State<_HistoryTab> {
   @override
   void dispose() {
     _mpesaSub?.cancel();
+    _refreshSub?.cancel();
     super.dispose();
   }
 
   void _load() {
     final next = _repo.getRecentFinancials();
-    setState(() => _future = next);
+    if (mounted) setState(() => _future = next);
   }
 
   @override
@@ -460,7 +462,11 @@ class _HistoryTabState extends State<_HistoryTab> {
 
         return RefreshIndicator(
           color: const Color(0xFF2D6A4F),
-          onRefresh: () { _load(); return Future.value(); },
+          onRefresh: () async {
+              final next = _repo.getRecentFinancials();
+              if (mounted) setState(() => _future = next);
+             // await next.catchError((_) {});
+            },
           child: ListView(
             padding: const EdgeInsets.fromLTRB(20, 20, 20, 40),
             children: [

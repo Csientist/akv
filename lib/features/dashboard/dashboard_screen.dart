@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../data/models/ledger_entry.dart';
 import '../../data/repositories/ledger_repository.dart';
 import '../../services/app_refresh_service.dart';
+import '../../services/sync_service.dart';
 import 'sync_debug_sheet.dart';
 
 
@@ -14,13 +15,20 @@ class DashboardScreen extends StatefulWidget {
 
 class _DashboardScreenState extends State<DashboardScreen> {
   final _repo = LedgerRepository();
-  late Future<DashboardSummary> _future;
+
+  // Keep the last successfully loaded summary so we can show stale data
+  // while a new load is in progress — avoids the full-screen spinner on
+  // every refresh tick.
+  DashboardSummary? _data;
+  bool _loading = false;
+  Object?  _error;
+
   StreamSubscription<void>? _refreshSub;
 
   @override
   void initState() {
     super.initState();
-    _future = _repo.getDashboardSummary();
+    _load();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       _refreshSub = AppRefreshService.instance.ticks.listen((_) {
@@ -35,11 +43,22 @@ class _DashboardScreenState extends State<DashboardScreen> {
     super.dispose();
   }
 
-  void _load() {
-    // Create the future BEFORE calling setState — never put async work inside
-    // the setState callback, or Flutter will throw "returned a Future" assertion.
-    final next = _repo.getDashboardSummary();
-    if (mounted) setState(() => _future = next);
+  Future<void> _load() async {
+    if (!mounted) return;
+    setState(() { _loading = true; _error = null; });
+    try {
+      final summary = await _repo.getDashboardSummary();
+      if (mounted) setState(() { _data = summary; _loading = false; });
+    } catch (e) {
+      if (mounted) setState(() { _error = e; _loading = false; });
+    }
+  }
+
+  // Trigger a full sync then reload — used by the manual refresh button
+  // and pull-to-refresh so the user always gets fresh cloud data on demand.
+  Future<void> _syncAndLoad() async {
+    await SyncService().fullSync();
+    await _load();
   }
   @override
   Widget build(BuildContext context) {
@@ -57,116 +76,164 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 fontWeight: FontWeight.bold,
                 color: scheme.primary)),
         actions: [
-          IconButton(
-            onPressed: _load,
-            icon: const Icon(Icons.refresh_rounded),
-            color: const Color(0xFF2D6A4F),
-            tooltip: 'Refresh',
-          ),
+          // Show a spinner in the app bar while syncing/loading,
+          // otherwise show the manual refresh button.
+          if (_loading && _data != null)
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 16),
+              child: SizedBox(
+                width: 18, height: 18,
+                child: CircularProgressIndicator(
+                    strokeWidth: 2, color: Color(0xFF2D6A4F)),
+              ),
+            )
+          else
+            IconButton(
+              onPressed: _syncAndLoad,
+              icon: const Icon(Icons.sync_rounded),
+              color: const Color(0xFF2D6A4F),
+              tooltip: 'Sync & Refresh',
+            ),
         ],
       ),
-      body: FutureBuilder<DashboardSummary>(
-        future: _future,
-        builder: (context, snap) {
-          if (snap.connectionState == ConnectionState.waiting) {
-            return const Center(
-                child: CircularProgressIndicator(color: Color(0xFF2D6A4F)));
-          }
-          if (snap.hasError) {
-            return Center(
-              child: Column(mainAxisSize: MainAxisSize.min, children: [
-                const Icon(Icons.error_outline, size: 48, color: Colors.red),
-                const SizedBox(height: 12),
-                Text('Could not load data',
-                    style: TextStyle(color: Colors.grey.shade600)),
-                const SizedBox(height: 8),
-                TextButton(onPressed: _load, child: const Text('Retry')),
+      body: _buildBody(),
+    );
+  }
+
+  Widget _buildBody() {
+    // First load — no data yet
+    if (_data == null && _loading) {
+      return const Center(
+          child: CircularProgressIndicator(color: Color(0xFF2D6A4F)));
+    }
+
+    // First load failed
+    if (_data == null && _error != null) {
+      return Center(
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          const Icon(Icons.error_outline, size: 48, color: Colors.red),
+          const SizedBox(height: 12),
+          Text('Could not load data',
+              style: TextStyle(color: Colors.grey.shade600)),
+          const SizedBox(height: 8),
+          TextButton(onPressed: _load, child: const Text('Retry')),
+        ]),
+      );
+    }
+
+    final s = _data!;
+
+    return RefreshIndicator(
+      color: const Color(0xFF2D6A4F),
+      onRefresh: _syncAndLoad,
+      child: ListView(
+        padding: const EdgeInsets.fromLTRB(20, 16, 20, 40),
+        children: [
+          // ── Sync Status ────────────────────────────────────────────────
+          SyncBanner(pendingCount: s.pendingSyncCount),
+          const SizedBox(height: 20),
+
+          // ── Net Position Hero Card ──────────────────────────────────────
+          _NetPositionCard(summary: s),
+          const SizedBox(height: 20),
+
+          // ── Quick Stats Grid ────────────────────────────────────────────
+          const _SectionLabel('Quick Stats'),
+          const SizedBox(height: 12),
+          GridView.count(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            crossAxisCount: 2,
+            crossAxisSpacing: 12,
+            mainAxisSpacing: 12,
+            childAspectRatio: 1.55,
+            children: [
+              _StatCard(
+                icon: Icons.trending_up,
+                label: 'This Month',
+                value: _fmt(s.totalSalesThisMonth),
+                color: const Color(0xFF2D6A4F),
+              ),
+              _StatCard(
+                icon: Icons.hourglass_top_outlined,
+                label: 'Outstanding',
+                value: s.totalOutstanding == 0
+                    ? 'All paid ✓'
+                    : _fmt(s.totalOutstanding),
+                color: s.totalOutstanding > 0
+                    ? Colors.orange.shade700
+                    : const Color(0xFF2D6A4F),
+                alert: s.totalOutstanding > 0,
+              ),
+              _StatCard(
+                icon: Icons.pets,
+                label: 'Livestock',
+                value: '${s.livestockCount} head',
+                color: const Color(0xFF2D6A4F),
+              ),
+              _StatCard(
+                icon: Icons.inventory_2_outlined,
+                label: 'Low Stock',
+                value: s.lowStockCount == 0
+                    ? 'All good ✓'
+                    : '${s.lowStockCount} item${s.lowStockCount > 1 ? 's' : ''}',
+                color: s.lowStockCount > 0
+                    ? Colors.orange.shade700
+                    : const Color(0xFF2D6A4F),
+                alert: s.lowStockCount > 0,
+              ),
+            ],
+          ),
+          const SizedBox(height: 24),
+
+          // ── Recent Activity ─────────────────────────────────────────────
+          Row(children: [
+            const _SectionLabel('Recent Activity'),
+            const Spacer(),
+            if (s.recentTransactions.isNotEmpty)
+              Text(
+                '${s.recentTransactions.length} transactions',
+                style: TextStyle(
+                    fontSize: 11,
+                    color: Colors.grey.shade500,
+                    fontWeight: FontWeight.w500),
+              ),
+          ]),
+          const SizedBox(height: 12),
+          if (s.recentTransactions.isEmpty)
+            _EmptyActivity()
+          else
+            ...s.recentTransactions.map((t) => _ActivityTile(txn: t)),
+
+          // ── Totals footer ───────────────────────────────────────────────
+          if (s.recentTransactions.isNotEmpty) ...[
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFFD8E8E0)),
+              ),
+              child: Row(children: [
+                _FooterStat('All-time Sales',
+                    _fmt(s.totalSalesAllTime), const Color(0xFF2D6A4F)),
+                Container(width: 1, height: 28,
+                    color: const Color(0xFFD8E8E0),
+                    margin: const EdgeInsets.symmetric(horizontal: 16)),
+                _FooterStat('All-time Purchases',
+                    _fmt(s.totalPurchasesAllTime), const Color(0xFF9B2226)),
               ]),
-            );
-          }
-
-          final s = snap.data!;
-
-          return RefreshIndicator(
-            color: const Color(0xFF2D6A4F),
-            onRefresh: () async {
-              final next = _repo.getDashboardSummary();
-              if (mounted) setState(() => _future = next);
-             // await next.catchError((_) {});
-            },
-            child: ListView(
-              padding: const EdgeInsets.fromLTRB(20, 16, 20, 40),
-              children: [
-                // ── Sync Status ──────────────────────────────────────────
-                SyncBanner(pendingCount: s.pendingSyncCount),
-                const SizedBox(height: 20),
-
-                // ── Net Position Hero Card ───────────────────────────────
-                _NetPositionCard(summary: s),
-                const SizedBox(height: 20),
-
-                // ── Quick Stats Grid ─────────────────────────────────────
-                const _SectionLabel('Quick Stats'),
-                const SizedBox(height: 12),
-                GridView.count(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  crossAxisCount: 2,
-                  crossAxisSpacing: 12,
-                  mainAxisSpacing: 12,
-                  childAspectRatio: 1.55,
-                  children: [
-                    _StatCard(
-                      icon: Icons.trending_up,
-                      label: 'This Month',
-                      value: _formatKes(s.totalSalesThisMonth),
-                      color: const Color(0xFF2D6A4F),
-                    ),
-                    _StatCard(
-                      icon: Icons.trending_down,
-                      label: 'Total Purchases',
-                      value: _formatKes(s.totalPurchasesAllTime),
-                      color: const Color(0xFF9B2226),
-                    ),
-                    _StatCard(
-                      icon: Icons.pets,
-                      label: 'Livestock',
-                      value: '${s.livestockCount} head',
-                      color: const Color(0xFF2D6A4F),
-                    ),
-                    _StatCard(
-                      icon: Icons.inventory_2_outlined,
-                      label: 'Low Stock',
-                      value: s.lowStockCount == 0
-                          ? 'All good ✓'
-                          : '${s.lowStockCount} item${s.lowStockCount > 1 ? 's' : ''}',
-                      color: s.lowStockCount > 0
-                          ? Colors.orange.shade700
-                          : const Color(0xFF2D6A4F),
-                      alert: s.lowStockCount > 0,
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 24),
-
-                // ── Recent Activity ──────────────────────────────────────
-                const _SectionLabel('Recent Activity'),
-                const SizedBox(height: 12),
-                if (s.recentTransactions.isEmpty)
-                  _EmptyActivity()
-                else
-                  ...s.recentTransactions.map((t) => _ActivityTile(txn: t)),
-              ],
             ),
-          );
-        },
+          ],
+        ],
       ),
     );
   }
 
-  String _formatKes(double amount) {
+  String _fmt(double amount) {
     if (amount >= 1000000) return 'KES ${(amount / 1000000).toStringAsFixed(1)}M';
-    if (amount >= 1000) return 'KES ${(amount / 1000).toStringAsFixed(1)}k';
+    if (amount >= 1000)    return 'KES ${(amount / 1000).toStringAsFixed(1)}k';
     return 'KES ${amount.toStringAsFixed(0)}';
   }
 }
@@ -515,4 +582,28 @@ class _SectionLabel extends StatelessWidget {
   Widget build(BuildContext context) => Text(text.toUpperCase(),
       style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w700,
           color: Color(0xFF2D6A4F), letterSpacing: 1.6));
+}
+
+class _FooterStat extends StatelessWidget {
+  final String label;
+  final String value;
+  final Color  color;
+  const _FooterStat(this.label, this.value, this.color);
+
+  @override
+  Widget build(BuildContext context) => Expanded(
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(label,
+              style: TextStyle(
+                  fontSize: 10,
+                  color: Colors.grey.shade500,
+                  fontWeight: FontWeight.w500)),
+          const SizedBox(height: 2),
+          Text(value,
+              style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w800,
+                  color: color)),
+        ]),
+      );
 }

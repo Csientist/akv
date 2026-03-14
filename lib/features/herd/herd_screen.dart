@@ -1,10 +1,13 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:uuid/uuid.dart';
 import '../../data/models/ledger_entry.dart';
 import '../../data/repositories/ledger_repository.dart';
 import '../../services/app_refresh_service.dart';
+import '../../services/asset_image_widget.dart';
+import '../../services/image_service.dart';
 import '../../services/session_manager.dart';
 
 class HerdManagementScreen extends StatefulWidget {
@@ -299,18 +302,45 @@ class _AnimalDetailSheet extends StatefulWidget {
 class _AnimalDetailSheetState extends State<_AnimalDetailSheet> {
   late Future<List<AssetEvent>> _eventsFuture;
   late Future<double> _totalMilk;
+  List<FarmImage> _images = [];
 
   @override
   void initState() {
     super.initState();
     _load();
+    _loadImages();
   }
 
   void _load() {
+    final events = widget.repo.getEventsForAsset(widget.asset.assetId);
+    final milk   = widget.repo.getTotalMilkForAsset(widget.asset.assetId);
     setState(() {
-      _eventsFuture = widget.repo.getEventsForAsset(widget.asset.assetId);
-      _totalMilk = widget.repo.getTotalMilkForAsset(widget.asset.assetId);
+      _eventsFuture = events;
+      _totalMilk    = milk;
     });
+  }
+
+  Future<void> _loadImages() async {
+    final imgs = await ImageService.instance.getImages(
+      entityType: ImageEntityType.asset,
+      entityId:   widget.asset.assetId,
+    );
+    if (mounted) setState(() => _images = imgs);
+  }
+
+  Future<void> _pickImage(ImageSource source) async {
+    final img = await ImageService.instance.pickAndSave(
+      entityType: ImageEntityType.asset,
+      entityId:   widget.asset.assetId,
+      createdBy:  SessionManager.instance.currentUserId,
+      source:     source,
+    );
+    if (img != null) await _loadImages();
+  }
+
+  Future<void> _deleteImage(FarmImage img) async {
+    await ImageService.instance.delete(img);
+    await _loadImages();
   }
 
   @override
@@ -380,6 +410,17 @@ class _AnimalDetailSheetState extends State<_AnimalDetailSheet> {
                 ]),
               ),
             ],
+            const SizedBox(height: 20),
+
+            // Photos
+            const _SectionLabel('Photos'),
+            const SizedBox(height: 10),
+            AssetImageStrip(
+              images:    _images,
+              maxImages: 3,
+              onAdd:     (source) => _pickImage(source),
+              onDelete:  (img)    => _deleteImage(img),
+            ),
             const SizedBox(height: 20),
 
             // Log event button
@@ -572,15 +613,18 @@ class _LogEventSheet extends StatefulWidget {
 }
 
 class _LogEventSheetState extends State<_LogEventSheet> {
+  // Generate the eventId upfront so images can be attached before saving.
+  final String _eventId   = const Uuid().v4();
   String? _selectedType;
   final _notesCtrl  = TextEditingController();
-  final _meta1Ctrl  = TextEditingController(); // context-specific field 1
-  final _meta2Ctrl  = TextEditingController(); // context-specific field 2
+  final _meta1Ctrl  = TextEditingController();
+  final _meta2Ctrl  = TextEditingController();
   final userId = SessionManager.instance.currentUserId;
 
   DateTime _recordedAt = DateTime.now();
   bool _saving = false;
   MilkSession _milkSession = MilkSession.am;
+  List<FarmImage> _images = [];
 
   bool get _isLivestock => widget.asset.category == AssetCategory.livestock;
 
@@ -720,6 +764,21 @@ class _LogEventSheetState extends State<_LogEventSheet> {
     return m;
   }
 
+  Future<void> _pickImage(ImageSource source) async {
+    final img = await ImageService.instance.pickAndSave(
+      entityType: ImageEntityType.assetEvent,
+      entityId:   _eventId,
+      createdBy:  userId,
+      source:     source,
+    );
+    if (img != null && mounted) setState(() => _images = [..._images, img]);
+  }
+
+  Future<void> _deleteImage(FarmImage img) async {
+    await ImageService.instance.delete(img);
+    if (mounted) setState(() => _images = _images.where((i) => i.imageId != img.imageId).toList());
+  }
+
   Future<void> _save() async {
     if (_selectedType == null) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -729,7 +788,7 @@ class _LogEventSheetState extends State<_LogEventSheet> {
     setState(() => _saving = true);
     try {
       final event = AssetEvent(
-        eventId: const Uuid().v4(),
+        eventId: _eventId,
         assetId: widget.asset.assetId,
         eventType: _selectedType!,
         notes: _notesCtrl.text.trim().isNotEmpty ? _notesCtrl.text.trim() : null,
@@ -837,6 +896,17 @@ class _LogEventSheetState extends State<_LogEventSheet> {
             prefixIcon: Icon(Icons.notes_outlined, size: 18),
           ),
           maxLines: 2,
+        ),
+        const SizedBox(height: 20),
+
+        // Photos (1 image per event)
+        const _SectionLabel('Photo'),
+        const SizedBox(height: 10),
+        AssetImageStrip(
+          images:    _images,
+          maxImages: 1,
+          onAdd:     (source) => _pickImage(source),
+          onDelete:  (img)    => _deleteImage(img),
         ),
         const SizedBox(height: 24),
 
