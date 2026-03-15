@@ -354,12 +354,21 @@
   /* ─── FEATURES STRIP ─── */
   .features-strip {
     background: var(--bark);
-    padding: 1.5rem 5rem;
-    display: flex; gap: 0;
+    padding: 0;
+    display: flex;
     overflow: hidden;
     border-top: 1px solid rgba(58,125,68,.3);
     border-bottom: 1px solid rgba(58,125,68,.3);
+    position: relative;
   }
+  .features-strip-track {
+    display: flex;
+    gap: 0;
+    width: max-content;
+    padding: 1.2rem 0;
+    animation: marquee 28s linear infinite;
+  }
+  .features-strip:hover .features-strip-track { animation-play-state: paused; }
   .feature-chip {
     display: flex; align-items: center; gap: .6rem;
     padding: 0 2rem;
@@ -848,13 +857,306 @@
   }
   .footer-links a:hover { color: var(--clay); }
 
-  /* ─── SCROLL ANIMATIONS ─── */
+  /* ══════════════════════════════════════
+     ANIMATION SYSTEM
+  ══════════════════════════════════════ */
+
+  /* ─── Reduced motion safety net ─── */
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: .01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: .01ms !important;
+    }
+  }
+
+  /* ─── Page transitions ─── */
+  .page {
+    display: none;
+    padding-top: 64px;
+    min-height: 100vh;
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  .page.active {
+    display: block;
+    animation: pageIn .35s cubic-bezier(.22,.68,0,1.2) forwards;
+  }
+  @keyframes pageIn {
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  /* ─── Hero entrance — staggered ─── */
+  .hero-eyebrow {
+    opacity: 0;
+    animation: heroItem .6s .1s cubic-bezier(.22,.68,0,1.1) forwards;
+  }
+  .hero-title {
+    opacity: 0;
+    animation: heroItem .7s .22s cubic-bezier(.22,.68,0,1.1) forwards;
+  }
+  .hero-desc {
+    opacity: 0;
+    animation: heroItem .6s .38s ease forwards;
+  }
+  .hero-ctas {
+    opacity: 0;
+    animation: heroItem .6s .52s ease forwards;
+  }
+  .screen-showcase {
+    opacity: 0;
+    animation: showcaseIn .9s .3s cubic-bezier(.22,.68,0,1.1) forwards;
+  }
+  @keyframes heroItem {
+    from { opacity: 0; transform: translateY(18px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes showcaseIn {
+    from { opacity: 0; transform: translateY(32px) scale(.96); }
+    to   { opacity: 1; transform: translateY(0) scale(1); }
+  }
+
+  /* ─── Phone idle float ─── */
+  .mock-center {
+    animation: phoneFloat 4s ease-in-out infinite;
+  }
+  .mock-back-left {
+    animation: phoneFloatL 4.5s .4s ease-in-out infinite;
+  }
+  .mock-back-right {
+    animation: phoneFloatR 4.2s .8s ease-in-out infinite;
+  }
+  @keyframes phoneFloat {
+    0%, 100% { transform: translateY(0) scale(1); }
+    50%       { transform: translateY(-10px) scale(1); }
+  }
+  @keyframes phoneFloatL {
+    0%, 100% { transform: translateX(-130px) translateY(20px) scale(0.82) rotate(-6deg); }
+    50%       { transform: translateX(-130px) translateY(10px) scale(0.82) rotate(-5deg); }
+  }
+  @keyframes phoneFloatR {
+    0%, 100% { transform: translateX(130px) translateY(20px) scale(0.82) rotate(6deg); }
+    50%       { transform: translateX(130px) translateY(10px) scale(0.82) rotate(5deg); }
+  }
+
+  /* ─── Phone showcase hover fan-out ─── */
+  .screen-showcase:hover .mock-back-left {
+    transform: translateX(-155px) translateY(10px) scale(0.85) rotate(-10deg);
+    opacity: .85;
+    transition: transform .5s cubic-bezier(.22,.68,0,1.2), opacity .3s;
+  }
+  .screen-showcase:hover .mock-back-right {
+    transform: translateX(155px) translateY(10px) scale(0.85) rotate(10deg);
+    opacity: .85;
+    transition: transform .5s cubic-bezier(.22,.68,0,1.2), opacity .3s;
+  }
+  .screen-showcase:hover .mock-center {
+    transform: translateY(-6px) scale(1.03);
+    transition: transform .4s cubic-bezier(.22,.68,0,1.2);
+  }
+
+  /* ─── Features strip marquee ─── */
+  .features-strip {
+    overflow: hidden;
+    position: relative;
+  }
+  .features-strip-track {
+    display: flex;
+    gap: 0;
+    width: max-content;
+    animation: marquee 28s linear infinite;
+  }
+  .features-strip:hover .features-strip-track { animation-play-state: paused; }
+  @keyframes marquee {
+    from { transform: translateX(0); }
+    to   { transform: translateX(-50%); }
+  }
+
+  /* ─── Scroll reveal — base ─── */
   .fade-up {
     opacity: 0;
-    transform: translateY(24px);
-    transition: opacity .5s ease, transform .5s ease;
+    transform: translateY(28px);
+    transition: opacity .55s ease, transform .55s cubic-bezier(.22,.68,0,1.1);
   }
   .fade-up.visible { opacity: 1; transform: translateY(0); }
+
+  /* Stagger delays for feature grid children */
+  .feature-grid .feature-card:nth-child(1) { transition-delay: 0s; }
+  .feature-grid .feature-card:nth-child(2) { transition-delay: .08s; }
+  .feature-grid .feature-card:nth-child(3) { transition-delay: .16s; }
+  .feature-grid .feature-card:nth-child(4) { transition-delay: .24s; }
+  .feature-grid .feature-card:nth-child(5) { transition-delay: .32s; }
+  .feature-grid .feature-card:nth-child(6) { transition-delay: .40s; }
+
+  /* Changelog release entries slide in */
+  .release {
+    opacity: 0;
+    transform: translateX(-16px);
+    transition: opacity .5s ease, transform .5s cubic-bezier(.22,.68,0,1.1);
+  }
+  .release.visible { opacity: 1; transform: translateX(0); }
+  .release:nth-child(2) { transition-delay: .1s; }
+  .release:nth-child(3) { transition-delay: .2s; }
+  .release:nth-child(4) { transition-delay: .3s; }
+
+  /* Arch cards stagger */
+  .arch-card {
+    opacity: 0;
+    transform: translateY(20px);
+    transition: opacity .45s ease, transform .45s cubic-bezier(.22,.68,0,1.1);
+  }
+  .arch-card.visible { opacity: 1; transform: translateY(0); }
+  .arch-grid .arch-card:nth-child(2) { transition-delay: .07s; }
+  .arch-grid .arch-card:nth-child(3) { transition-delay: .14s; }
+  .arch-grid .arch-card:nth-child(4) { transition-delay: .21s; }
+  .arch-grid .arch-card:nth-child(5) { transition-delay: .28s; }
+  .arch-grid .arch-card:nth-child(6) { transition-delay: .35s; }
+
+  /* ─── Button shimmer (primary) ─── */
+  .btn-primary {
+    overflow: hidden;
+    position: relative;
+  }
+  .btn-primary::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(105deg, transparent 40%, rgba(255,255,255,.22) 50%, transparent 60%);
+    transform: translateX(-100%);
+    transition: transform 0s;
+  }
+  .btn-primary:hover::after {
+    transform: translateX(100%);
+    transition: transform .5s ease;
+  }
+
+  /* ─── Ghost button border draw ─── */
+  .btn-ghost {
+    position: relative;
+    overflow: hidden;
+  }
+  .btn-ghost::before {
+    content: '';
+    position: absolute;
+    bottom: 0; left: 0;
+    width: 0; height: 1px;
+    background: var(--clay);
+    transition: width .3s ease;
+  }
+  .btn-ghost:hover::before { width: 100%; }
+
+  /* ─── Feature icon bounce ─── */
+  .feature-card:hover .feature-icon {
+    animation: iconBounce .4s cubic-bezier(.36,.07,.19,.97);
+  }
+  @keyframes iconBounce {
+    0%   { transform: scale(1); }
+    30%  { transform: scale(1.2) rotate(-4deg); }
+    60%  { transform: scale(.92) rotate(2deg); }
+    100% { transform: scale(1) rotate(0deg); }
+  }
+
+  /* ─── Sidebar active link ink fill ─── */
+  .sidebar-link {
+    position: relative;
+    overflow: hidden;
+  }
+  .sidebar-link::after {
+    content: '';
+    position: absolute;
+    left: 0; top: 0; bottom: 0;
+    width: 0;
+    background: rgba(90,171,103,.08);
+    transition: width .25s ease;
+    z-index: -1;
+  }
+  .sidebar-link.active::after { width: 100%; }
+  .sidebar-link {
+    border-left: 2px solid transparent;
+    transition: color .2s, border-color .2s, background .2s;
+  }
+  .sidebar-link.active {
+    color: var(--clay);
+    border-left-color: var(--clay);
+  }
+
+  /* ─── Tag hover lift ─── */
+  .tag {
+    transition: background .2s, transform .2s, border-color .2s;
+    cursor: default;
+  }
+  .tag:hover {
+    background: rgba(58,125,68,.18);
+    border-color: var(--terracotta);
+    transform: translateY(-2px);
+  }
+
+  /* ─── Nav link underline draw ─── */
+  .nav-links a {
+    position: relative;
+  }
+  .nav-links a::after {
+    content: '';
+    position: absolute;
+    bottom: -2px; left: 0;
+    width: 0; height: 1px;
+    background: var(--clay);
+    transition: width .25s ease;
+  }
+  .nav-links a:hover::after,
+  .nav-links a.active::after { width: 100%; }
+  /* Remove old border-bottom approach */
+  .nav-links a { border-bottom: none; }
+
+  /* ─── Collection table row highlight ─── */
+  .collection-table tr {
+    transition: background .15s;
+  }
+
+  /* ─── Section label line grow ─── */
+  .section-label::before {
+    width: 0;
+    transition: width .4s .2s ease;
+  }
+  .section-label.line-visible::before { width: 1.8rem; }
+
+  /* ─── Hero visual glow pulse ─── */
+  .hero-visual::before {
+    animation: glowPulse 6s ease-in-out infinite;
+  }
+  @keyframes glowPulse {
+    0%, 100% { opacity: 1; }
+    50%       { opacity: .4; }
+  }
+
+  /* ─── Callout entrance ─── */
+  .callout {
+    opacity: 0;
+    transform: translateX(-8px);
+    transition: opacity .4s ease, transform .4s ease;
+  }
+  .callout.visible { opacity: 1; transform: translateX(0); }
+
+  /* ─── Nav drawer slide ─── */
+  .nav-drawer {
+    transform: translateY(-8px);
+    opacity: 0;
+    transition: transform .25s cubic-bezier(.22,.68,0,1.2), opacity .2s ease;
+  }
+  .nav-drawer.open {
+    display: flex;
+    transform: translateY(0);
+    opacity: 1;
+  }
+
+  /* ─── Step number pop ─── */
+  .step-num {
+    transition: transform .2s cubic-bezier(.36,.07,.19,.97), background .2s;
+  }
+  .step:hover .step-num {
+    transform: scale(1.15);
+    background: var(--clay);
+  }
 
   /* ─── HAMBURGER BUTTON ─── */
   .nav-hamburger {
@@ -948,16 +1250,7 @@
     .hero-stats { gap: 1.5rem; flex-wrap: wrap; }
     .stat-num { font-size: 1.6rem; }
 
-    /* Features strip — horizontal scroll */
-    .features-strip {
-      padding: .9rem 1rem;
-      overflow-x: auto;
-      -webkit-overflow-scrolling: touch;
-      flex-wrap: nowrap;
-      scrollbar-width: none;
-    }
-    .features-strip::-webkit-scrollbar { display: none; }
-    .feature-chip { padding: 0 1.2rem; }
+    /* Features strip — let marquee run on mobile, no override needed */
 
     /* Sections */
     section { padding: 2.5rem 1.4rem; }
@@ -1224,12 +1517,25 @@
 
   <!-- FEATURES STRIP -->
   <div class="features-strip">
-    <div class="feature-chip"><div class="dot"></div><span>Offline-first SQLite</span></div>
-    <div class="feature-chip"><div class="dot"></div><span>Transactional outbox sync</span></div>
-    <div class="feature-chip"><div class="dot" style="background:var(--harvest)"></div><span>Conflict detection</span></div>
-    <div class="feature-chip"><div class="dot" style="background:var(--river)"></div><span>Photo capture + compression</span></div>
-    <div class="feature-chip"><div class="dot"></div><span>M-Pesa ready</span></div>
-    <div class="feature-chip"><div class="dot" style="background:var(--harvest)"></div><span>PIN auth layer</span></div>
+    <div class="features-strip-track">
+      <div class="feature-chip"><div class="dot"></div><span>Offline-first SQLite</span></div>
+      <div class="feature-chip"><div class="dot"></div><span>Transactional outbox sync</span></div>
+      <div class="feature-chip"><div class="dot" style="background:var(--harvest)"></div><span>Conflict detection</span></div>
+      <div class="feature-chip"><div class="dot" style="background:var(--river)"></div><span>Photo capture + compression</span></div>
+      <div class="feature-chip"><div class="dot"></div><span>M-Pesa ready</span></div>
+      <div class="feature-chip"><div class="dot" style="background:var(--harvest)"></div><span>PIN auth layer</span></div>
+      <div class="feature-chip"><div class="dot" style="background:var(--river)"></div><span>Bidirectional sync</span></div>
+      <div class="feature-chip"><div class="dot"></div><span>Android-first</span></div>
+      <!-- duplicate for seamless loop -->
+      <div class="feature-chip"><div class="dot"></div><span>Offline-first SQLite</span></div>
+      <div class="feature-chip"><div class="dot"></div><span>Transactional outbox sync</span></div>
+      <div class="feature-chip"><div class="dot" style="background:var(--harvest)"></div><span>Conflict detection</span></div>
+      <div class="feature-chip"><div class="dot" style="background:var(--river)"></div><span>Photo capture + compression</span></div>
+      <div class="feature-chip"><div class="dot"></div><span>M-Pesa ready</span></div>
+      <div class="feature-chip"><div class="dot" style="background:var(--harvest)"></div><span>PIN auth layer</span></div>
+      <div class="feature-chip"><div class="dot" style="background:var(--river)"></div><span>Bidirectional sync</span></div>
+      <div class="feature-chip"><div class="dot"></div><span>Android-first</span></div>
+    </div>
   </div>
 
   <!-- WHAT IT DOES -->
@@ -1330,7 +1636,7 @@
         <div class="step-num">1</div>
         <div class="step-body">
           <h4>Clone the repository</h4>
-          <pre><code>git clone https://github.com/your-org/akavango-farm.git
+          <pre><code>git clone https://github.com/Csientist/akv.git
 cd akavango-farm</code></pre>
         </div>
       </div>
@@ -1379,12 +1685,10 @@ Endpoint   : https://YOUR_APPWRITE_ENDPOINT/v1</code></pre>
         <tr><td>partial_payments</td><td>payment_id</td><td>Instalments on a financial record</td></tr>
         <tr><td>asset_events</td><td>event_id</td><td>Activity log per asset</td></tr>
         <tr><td>milk_logs</td><td>log_id</td><td>Milk sessions</td></tr>
-        <tr><td>asset_images</td><td>image_id</td><td>⚠️ Must be created manually — see below</td></tr>
+        <tr><td>asset_images</td><td>image_id</td><td>This stores reference + thumbnail URL</td></tr>
         <tr><td>sync_conflicts</td><td>conflict_id</td><td>Conflict audit log</td></tr>
       </tbody>
     </table></div>
-
-    <div class="callout danger"><strong>Important:</strong> The <code>asset_images</code> collection must be created in the Appwrite Console before image sync works end-to-end. It is not auto-provisioned.</div>
 
     <h3>Required Indexes (on every collection)</h3>
     <pre><code>created_by  → Key ASC
@@ -1461,9 +1765,6 @@ flutter build appbundle --release</code></pre>
     </div>
     <div class="callout">
       <strong>M-Pesa no-receipt path</strong> — Partial payments via M-Pesa are unsupported when no receipt exists. A "manual M-Pesa entry" option is on the roadmap.
-    </div>
-    <div class="callout info">
-      <strong>asset_images collection</strong> — Must be manually created in the Appwrite Console. Image sync will fail silently until this collection exists.
     </div>
   </main>
 </div>
@@ -1636,7 +1937,6 @@ DownSyncService.pull()
     <tbody>
       <tr><td>setState Future warning</td><td><span style="color:var(--harvest);font-family:var(--font-mono);font-size:.8rem">COSMETIC</span></td><td>Async refactor needed across all screen loaders</td></tr>
       <tr><td>M-Pesa manual entry</td><td><span style="color:var(--terracotta);font-family:var(--font-mono);font-size:.8rem">PLANNED</span></td><td>No-receipt M-Pesa payments not yet supported</td></tr>
-      <tr><td>asset_images collection</td><td><span style="color:var(--river);font-family:var(--font-mono);font-size:.8rem">MANUAL</span></td><td>Must be created in Console; not auto-provisioned</td></tr>
       <tr><td>SQLite migrations</td><td><span style="color:var(--harvest);font-family:var(--font-mono);font-size:.8rem">BETA ONLY</span></td><td>Schema v1 only — beta, fresh-install assumption</td></tr>
     </tbody>
   </table></div>
@@ -1684,7 +1984,6 @@ DownSyncService.pull()
         <ul class="change-list">
           <li><code>setState() callback returned a Future</code> warning on <code>_InventoryScreenState._load</code> and related screens — non-fatal, cosmetic; async refactor pending</li>
           <li>Partial payments via M-Pesa unsupported when no receipt exists — manual M-Pesa entry option planned</li>
-          <li><code>asset_images</code> Appwrite collection must be created manually in the Console before image sync works end-to-end</li>
           <li>SQLite schema version 1 — no migration support; beta assumes fresh install</li>
         </ul>
       </div>
@@ -1761,7 +2060,7 @@ DownSyncService.pull()
         <div class="change-group-label added">✦ Added</div>
         <ul class="change-list">
           <li>Flutter project initialisation — Android target, your Android device test device</li>
-          <li>Appwrite Cloud project and database provisioned (Frankfurt region)</li>
+          <li>Appwrite Cloud project and database provisioned</li>
           <li>Initial pubspec with core dependencies</li>
           <li>Basic navigation shell and placeholder screens</li>
         </ul>
@@ -1774,18 +2073,31 @@ DownSyncService.pull()
 
 <script>
   function showPage(id) {
-    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
-    document.getElementById('page-' + id).classList.add('active');
+    document.querySelectorAll('.page').forEach(p => {
+      p.classList.remove('active');
+      p.style.opacity = '';
+      p.style.transform = '';
+    });
+    const page = document.getElementById('page-' + id);
+    page.classList.add('active');
+
     // Desktop nav active state
     document.querySelectorAll('.nav-links a').forEach(a => a.classList.remove('active'));
     const el = document.getElementById('nav-' + id);
     if (el) el.classList.add('active');
+
     // Drawer active state
     document.querySelectorAll('.nav-drawer a').forEach(a => a.classList.remove('active'));
     const del = document.getElementById('drawer-' + id);
     if (del) del.classList.add('active');
-    window.scrollTo(0, 0);
-    initFadeUps();
+
+    window.scrollTo({ top: 0, behavior: 'instant' });
+
+    // Reset then re-observe animations on new page
+    requestAnimationFrame(() => {
+      initScrollAnimations();
+      initSectionLabels();
+    });
     return false;
   }
 
@@ -1803,9 +2115,17 @@ DownSyncService.pull()
   function toggleDrawer() {
     const drawer = document.getElementById('nav-drawer');
     const btn = document.getElementById('hamburger');
-    const open = drawer.classList.toggle('open');
-    btn.classList.toggle('open', open);
-    document.body.style.overflow = open ? 'hidden' : '';
+    const isOpen = drawer.classList.contains('open');
+    if (isOpen) {
+      closeDrawer();
+    } else {
+      drawer.style.display = 'flex';
+      // Force reflow so transition fires
+      drawer.offsetHeight;
+      drawer.classList.add('open');
+      btn.classList.add('open');
+      document.body.style.overflow = 'hidden';
+    }
   }
 
   function closeDrawer() {
@@ -1814,9 +2134,9 @@ DownSyncService.pull()
     drawer.classList.remove('open');
     btn.classList.remove('open');
     document.body.style.overflow = '';
+    setTimeout(() => { if (!drawer.classList.contains('open')) drawer.style.display = ''; }, 280);
   }
 
-  // Close drawer on outside tap
   document.addEventListener('click', function(e) {
     const drawer = document.getElementById('nav-drawer');
     const btn = document.getElementById('hamburger');
@@ -1825,14 +2145,48 @@ DownSyncService.pull()
     }
   });
 
-  function initFadeUps() {
+  // ── Scroll animation observer ──
+  function initScrollAnimations() {
+    const targets = document.querySelectorAll(
+      '.page.active .fade-up, .page.active .release, .page.active .arch-card, .page.active .callout'
+    );
     const obs = new IntersectionObserver((entries) => {
-      entries.forEach(e => { if (e.isIntersecting) e.target.classList.add('visible'); });
-    }, { threshold: 0.1 });
-    document.querySelectorAll('.fade-up').forEach(el => obs.observe(el));
+      entries.forEach(e => {
+        if (e.isIntersecting) {
+          e.target.classList.add('visible');
+          obs.unobserve(e.target);
+        }
+      });
+    }, { threshold: 0.08, rootMargin: '0px 0px -40px 0px' });
+    targets.forEach(el => obs.observe(el));
   }
 
-  document.addEventListener('DOMContentLoaded', initFadeUps);
+  // ── Section label line animation ──
+  function initSectionLabels() {
+    const labels = document.querySelectorAll('.page.active .section-label');
+    const obs = new IntersectionObserver((entries) => {
+      entries.forEach(e => {
+        if (e.isIntersecting) {
+          e.target.classList.add('line-visible');
+          obs.unobserve(e.target);
+        }
+      });
+    }, { threshold: 0.5 });
+    labels.forEach(l => obs.observe(l));
+  }
+
+  // ── Nav scroll shadow ──
+  window.addEventListener('scroll', () => {
+    const nav = document.querySelector('nav');
+    nav.style.boxShadow = window.scrollY > 10
+      ? '0 2px 24px rgba(0,0,0,.35)'
+      : 'none';
+  }, { passive: true });
+
+  document.addEventListener('DOMContentLoaded', () => {
+    initScrollAnimations();
+    initSectionLabels();
+  });
 </script>
 </body>
 </html>
