@@ -163,11 +163,11 @@ class _AppShellState extends State<AppShell> {
     _NavItem(label: 'Inventory', icon: Icons.inventory_2_outlined,   activeIcon: Icons.inventory_2),
   ];
 
-  final List<Widget> _screens = const [
-    DashboardScreen(),
-    NewSaleScreen(),
-    HerdManagementScreen(),
-    InventoryScreen(),
+  final List<Widget> _screens = [
+    const DashboardScreen(),
+    const NewSaleScreen(),
+    const HerdManagementScreen(),
+    const InventoryScreen(),
   ];
 
   @override

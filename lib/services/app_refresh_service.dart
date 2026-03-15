@@ -46,6 +46,9 @@ class AppRefreshService with WidgetsBindingObserver {
     // Evict stale cache files on startup — fire-and-forget
     ImageService.instance.evictExpiredCache();
     Log.i('[AppRefresh] Started — ticking every ${interval.inSeconds}s.');
+    // Immediate tick so all screens load data right after unlock
+    // rather than waiting up to [interval] seconds for the first timer fire.
+    _tick();
   }
 
   void stop() {
