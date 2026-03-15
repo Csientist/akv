@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import '../../core/appwrite_client.dart';
 import '../../core/local_db.dart';
 import '../../services/sync_service.dart';
+import '../../services/session_manager.dart';
 
 class SyncDebugSheet extends StatefulWidget {
   const SyncDebugSheet({super.key});
@@ -19,7 +20,7 @@ class _SyncDebugSheetState extends State<SyncDebugSheet>
   @override
   void initState() {
     super.initState();
-    _tabs = TabController(length: 2, vsync: this);
+    _tabs = TabController(length: 3, vsync: this);
   }
 
   @override
@@ -72,6 +73,7 @@ class _SyncDebugSheetState extends State<SyncDebugSheet>
           tabs: const [
             Tab(text: 'Sync Queue'),
             Tab(text: 'Conflicts'),
+            Tab(text: 'DB Inspector'),
           ],
         ),
         const Divider(height: 1),
@@ -81,6 +83,7 @@ class _SyncDebugSheetState extends State<SyncDebugSheet>
             children: [
               _QueueTab(onChanged: () => setState(() {})),
               const _ConflictsTab(),
+              const _DbInspectorTab(),
             ],
           ),
         ),
@@ -545,4 +548,265 @@ class _DiffBadge extends StatelessWidget {
                 color: color,
                 letterSpacing: 0.5)),
       );
+}
+
+// ── DB Inspector Tab ──────────────────────────────────────────────────────────
+
+class _DbInspectorTab extends StatefulWidget {
+  const _DbInspectorTab();
+  @override
+  State<_DbInspectorTab> createState() => _DbInspectorTabState();
+}
+
+class _DbInspectorTabState extends State<_DbInspectorTab> {
+  late Future<_DbSnapshot> _future;
+
+  @override
+  void initState() {
+    super.initState();
+    _future = _snapshot();
+  }
+
+  Future<_DbSnapshot> _snapshot() async {
+    final db  = await LocalDb.instance.database;
+    final uid = SessionManager.instance.currentUserId;
+
+    // Row counts — all rows and rows belonging to this user
+    Future<int> count(String table, {bool myRows = false}) async {
+      final where = myRows ? 'WHERE created_by = ?' : '';
+      final args  = myRows ? [uid] : [];
+      final r = await db.rawQuery(
+          'SELECT COUNT(*) as c FROM $table $where', args);
+      return (r.first['c'] as int?) ?? 0;
+    }
+
+    final tables = [
+      'financials', 'assets', 'inventory', 'ledger_entries',
+      'asset_events', 'milk_logs', 'partial_payments',
+    ];
+
+    final counts = <String, _TableCount>{};
+    for (final t in tables) {
+      counts[t] = _TableCount(
+        total: await count(t),
+        mine:  await count(t, myRows: true),
+      );
+    }
+
+    // Sample last 8 financials — all rows, ignoring created_by filter
+    // so we can see if data is there but under a different user ID
+    final rows = await db.query(
+      'financials',
+      orderBy: 'created_at DESC',
+      limit: 8,
+    );
+
+    return _DbSnapshot(
+      userId:  uid,
+      counts:  counts,
+      recentFinancials: rows,
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<_DbSnapshot>(
+      future: _future,
+      builder: (context, snap) {
+        if (snap.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        if (snap.hasError) {
+          return Center(child: Text('Error: ${snap.error}',
+              style: const TextStyle(color: Colors.red)));
+        }
+        final s = snap.data!;
+        return ListView(
+          padding: const EdgeInsets.all(12),
+          children: [
+            // Current user ID
+            _InspectorSection(
+              label: 'SESSION',
+              child: _MonoRow('User ID', s.userId),
+            ),
+            const SizedBox(height: 12),
+
+            // Table counts
+            _InspectorSection(
+              label: 'TABLE COUNTS  (total / mine)',
+              child: Column(
+                children: s.counts.entries.map((e) {
+                  final match = e.value.mine == e.value.total;
+                  return Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 3),
+                    child: Row(children: [
+                      Expanded(child: Text(e.key,
+                          style: const TextStyle(
+                              fontSize: 12, fontFamily: 'monospace'))),
+                      Text(
+                        '${e.value.total} total / ${e.value.mine} mine',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                          color: e.value.total == 0
+                              ? Colors.grey
+                              : match
+                                  ? const Color(0xFF2D6A4F)
+                                  : Colors.orange.shade700,
+                        ),
+                      ),
+                    ]),
+                  );
+                }).toList(),
+              ),
+            ),
+            const SizedBox(height: 12),
+
+            // Recent financials sample (ignores created_by filter)
+            _InspectorSection(
+              label: 'RECENT FINANCIALS (ALL USERS)',
+              child: s.recentFinancials.isEmpty
+                  ? const Text('No rows in financials table.',
+                      style: TextStyle(color: Colors.grey, fontSize: 12))
+                  : Column(
+                      children: s.recentFinancials.map((row) {
+                        final mine = row['created_by'] == s.userId;
+                        return Container(
+                          margin: const EdgeInsets.only(bottom: 6),
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: mine
+                                ? const Color(0xFFEAF7EF)
+                                : Colors.orange.shade50,
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                              color: mine
+                                  ? const Color(0xFFB7E4C7)
+                                  : Colors.orange.shade200,
+                            ),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(children: [
+                                Expanded(
+                                  child: Text(
+                                    '${row['transaction_type']?.toString().toUpperCase()} — '
+                                    '${row['customer_supplier_name']}',
+                                    style: const TextStyle(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w700),
+                                  ),
+                                ),
+                                Text(
+                                  'KES ${row['amount']}',
+                                  style: const TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w800),
+                                ),
+                              ]),
+                              const SizedBox(height: 2),
+                              Text(
+                                'by: ${row['created_by']}',
+                                style: TextStyle(
+                                    fontSize: 10,
+                                    color: mine
+                                        ? const Color(0xFF2D6A4F)
+                                        : Colors.orange.shade800,
+                                    fontFamily: 'monospace'),
+                              ),
+                              Text(
+                                '${row['created_at']}  ·  '
+                                '${row['payment_status']}  ·  '
+                                '${row['payment_method']}',
+                                style: const TextStyle(
+                                    fontSize: 10, color: Colors.grey),
+                              ),
+                            ],
+                          ),
+                        );
+                      }).toList(),
+                    ),
+            ),
+            const SizedBox(height: 8),
+            Center(
+              child: TextButton.icon(
+                onPressed: () => setState(() => _future = _snapshot()),
+                icon: const Icon(Icons.refresh, size: 14),
+                label: const Text('Refresh', style: TextStyle(fontSize: 12)),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _InspectorSection extends StatelessWidget {
+  final String label;
+  final Widget child;
+  const _InspectorSection({required this.label, required this.child});
+
+  @override
+  Widget build(BuildContext context) => Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: const Color(0xFFD8E8E0)),
+        ),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(label,
+              style: const TextStyle(
+                  fontSize: 9,
+                  fontWeight: FontWeight.w800,
+                  color: Color(0xFF2D6A4F),
+                  letterSpacing: 1.3)),
+          const SizedBox(height: 8),
+          child,
+        ]),
+      );
+}
+
+class _MonoRow extends StatelessWidget {
+  final String label;
+  final String value;
+  const _MonoRow(this.label, this.value);
+
+  @override
+  Widget build(BuildContext context) => Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 70,
+            child: Text(label,
+                style: const TextStyle(fontSize: 11, color: Colors.grey)),
+          ),
+          Expanded(
+            child: Text(value,
+                style: const TextStyle(
+                    fontSize: 11,
+                    fontFamily: 'monospace',
+                    color: Color(0xFF111827))),
+          ),
+        ],
+      );
+}
+
+class _DbSnapshot {
+  final String userId;
+  final Map<String, _TableCount> counts;
+  final List<Map<String, dynamic>> recentFinancials;
+  const _DbSnapshot({
+    required this.userId,
+    required this.counts,
+    required this.recentFinancials,
+  });
+}
+
+class _TableCount {
+  final int total;
+  final int mine;
+  const _TableCount({required this.total, required this.mine});
 }

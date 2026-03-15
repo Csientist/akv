@@ -123,6 +123,9 @@ class DownSyncService {
         queries:      queries,
       );
 
+      Log.i('[DownSync] ${cfg.table}: Appwrite returned '
+          '${result.documents.length} doc(s) at offset $offset');
+
       if (result.documents.isEmpty) break;
 
       final db = await LocalDb.instance.database;
@@ -139,6 +142,15 @@ class DownSyncService {
           final recordId = incoming[cfg.primaryKey]?.toString();
           if (recordId == null) {
             Log.w('[DownSync] Skipping ${cfg.table} doc — null primaryKey');
+            continue;
+          }
+
+          // Client-side userId guard — belt-and-suspenders in case Appwrite
+          // permissions ever return documents belonging to another user.
+          final docUserId = incoming['created_by']?.toString();
+          if (docUserId != null && docUserId != userId) {
+            Log.w('[DownSync] Skipping ${cfg.table}/$recordId — '
+                'belongs to $docUserId not $userId');
             continue;
           }
 
@@ -186,8 +198,8 @@ class DownSyncService {
         await db.execute('PRAGMA foreign_keys = ON');
       }
 
-      Log.i('[DownSync] ${cfg.table}: wrote ${result.documents.length} '
-          'record(s) (offset $offset)');
+      Log.i('[DownSync] ${cfg.table}: wrote $written so far '
+          '(page offset $offset, ${result.documents.length} fetched)');
 
       if (result.documents.length < _pageSize) break;
       offset += _pageSize;
