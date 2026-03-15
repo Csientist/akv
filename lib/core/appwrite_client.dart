@@ -29,6 +29,9 @@ class AppwriteClient {
   // Storage bucket IDs
   static const bucketAssetImages  = '69a8620e00386a4836be';
 
+  // asset_images Appwrite collection ID (metadata — separate from the Storage bucket)
+  static const colAssetImages     = 'asset_images';
+
   void init() {
     client = Client()
       ..setEndpoint(_endpoint)

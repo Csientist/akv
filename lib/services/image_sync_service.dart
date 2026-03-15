@@ -56,11 +56,14 @@ class ImageSyncService {
         );
 
         await ImageService.instance.markUploaded(imageId, result.$id);
+        // Push metadata to DB collection so other devices can down-sync it
+        await _pushMetadata(row, result.$id);
         Log.i('[ImageSync] Uploaded $imageId → ${result.$id}');
       } on AppwriteException catch (e) {
         // 409 = file already exists in Appwrite (e.g. re-run after crash)
         if (e.code == 409) {
           await ImageService.instance.markUploaded(imageId, imageId);
+          await _pushMetadata(row, imageId);
           Log.w('[ImageSync] $imageId already exists in Appwrite — marked uploaded.');
         } else {
           Log.e('[ImageSync] Upload failed for $imageId: ${e.message}');
@@ -69,6 +72,52 @@ class ImageSyncService {
       } catch (e) {
         Log.e('[ImageSync] Unexpected error for $imageId: $e');
       }
+    }
+  }
+
+  /// Push image metadata to the asset_images Appwrite Database collection.
+  /// This is what lets other devices down-sync the image reference.
+  Future<void> _pushMetadata(Map<String, dynamic> row, String appwriteFileId) async {
+    try {
+      final databases = AppwriteClient.instance.databases;
+      final imageId   = row['image_id'] as String;
+      // Upsert pattern — try update first, create on 404
+      try {
+        await databases.updateDocument(
+          databaseId:   AppwriteClient.kDatabaseId,
+          collectionId: AppwriteClient.colAssetImages,
+          documentId:   imageId,
+          data: {
+            'appwrite_file_id': appwriteFileId,
+            'upload_status':    'uploaded',
+          },
+        );
+      } on AppwriteException catch (e) {
+        if (e.code == 404) {
+          await databases.createDocument(
+            databaseId:   AppwriteClient.kDatabaseId,
+            collectionId: AppwriteClient.colAssetImages,
+            documentId:   imageId,
+            data: {
+              'image_id':         imageId,
+              'entity_type':      row['entity_type'],
+              'entity_id':        row['entity_id'],
+              'sort_order':       row['sort_order'],
+              'appwrite_file_id': appwriteFileId,
+              'upload_status':    'uploaded',
+              'cached_until':     row['cached_until'],
+              'created_by':       row['created_by'],
+              'created_at':       row['created_at'],
+            },
+          );
+        } else {
+          rethrow;
+        }
+      }
+      Log.i('[ImageSync] Metadata pushed for $imageId');
+    } catch (e) {
+      // Non-fatal — Storage upload succeeded, metadata push can retry
+      Log.e('[ImageSync] Metadata push failed for ${row['image_id']}: $e');
     }
   }
 

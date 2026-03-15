@@ -1,3 +1,5 @@
+import 'package:appwrite/appwrite.dart';
+
 import '../core/logger.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import '../core/local_db.dart';
@@ -96,14 +98,22 @@ class SyncService {
       return;
     }
 
-    // asset_images rows are Storage uploads/deletes, not Database documents.
-    // ImageSyncService.uploadPending() handles CREATE — here we only handle DELETE.
+    // asset_images: DELETE removes both the Storage file and the DB metadata doc.
     if (tableName == 'asset_images') {
       try {
-        // recordId for DELETE is the image_id, which equals the Appwrite file ID.
         await ImageSyncService.instance.deleteFile(recordId);
+        // Also delete the metadata document from the Database collection
+        try {
+          await _remote.databases.deleteDocument(
+            databaseId:   AppwriteClient.kDatabaseId,
+            collectionId: AppwriteClient.colAssetImages,
+            documentId:   recordId,
+          );
+        } on AppwriteException catch (e) {
+          if (e.code != 404) rethrow; // 404 = already gone, fine
+        }
         await _db.removeFromQueue(queueId);
-        Log.i('[Sync] ✓ Deleted image file $recordId from Appwrite Storage');
+        Log.i('[Sync] ✓ Deleted image $recordId (Storage + DB)');
       } catch (e) {
         await _db.markQueueRetry(queueId, retryCount);
         Log.e('[Sync] ✗ Failed to delete image $recordId: $e');

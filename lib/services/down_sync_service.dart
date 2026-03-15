@@ -5,6 +5,8 @@ import 'package:uuid/uuid.dart';
 import '../core/appwrite_client.dart';
 import '../core/local_db.dart';
 import '../core/logger.dart';
+import 'image_service.dart';
+import 'image_sync_service.dart';
 
 /// Pulls records from every Appwrite collection into local SQLite.
 ///
@@ -59,6 +61,12 @@ class DownSyncService {
       table:      'milk_logs',
       primaryKey: 'log_id',
     ),
+    // Image metadata — must come after assets/asset_events so FK refs exist
+    _CollectionConfig(
+      collection: AppwriteClient.colAssetImages,
+      table:      'asset_images',
+      primaryKey: 'image_id',
+    ),
   ];
 
   // ── Public API ──────────────────────────────────────────────────────────────
@@ -81,13 +89,45 @@ class DownSyncService {
     Log.i('[DownSync] Pull complete — '
         '$totalWritten written, $totalConflicts conflict(s) recorded.');
 
-    // Advance ALL cursors to pull-start time so records written to Appwrite
-    // during our pull are caught on the next run.
+    // Advance ALL cursors to pull-start time.
     for (final cfg in _collections) {
       await LocalDb.instance.setLastSyncedAt(cfg.collection, pullStartedAt);
     }
 
+    // After metadata is synced, download thumbnails (sort_order = 0 only)
+    // so herd cards show photos immediately without waiting for on-demand load.
+    await _downloadThumbnails();
+
     return totalWritten;
+  }
+
+  /// Download the first image (sort_order = 0) for every asset that has an
+  /// uploaded image but no local cache file. All other images load on demand
+  /// via AssetImageWidget's fetchAndRecache fallback.
+  Future<void> _downloadThumbnails() async {
+    final db = await LocalDb.instance.database;
+
+    final rows = await db.query(
+      'asset_images',
+      where: "sort_order = 0 "
+             "AND appwrite_file_id IS NOT NULL "
+             "AND (local_path IS NULL OR local_path = '')",
+    );
+
+    if (rows.isEmpty) return;
+    Log.i('[DownSync] Downloading ${rows.length} thumbnail(s)...');
+
+    for (final row in rows) {
+      final image = FarmImage.fromMap(row);
+      try {
+        final path = await ImageSyncService.instance.fetchAndRecache(image);
+        if (path != null) {
+          Log.i('[DownSync] Thumbnail cached: ${image.imageId}');
+        }
+      } catch (e) {
+        Log.e('[DownSync] Thumbnail download failed ${image.imageId}: $e');
+      }
+    }
   }
 
   // ── Private ─────────────────────────────────────────────────────────────────

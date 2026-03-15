@@ -33,8 +33,14 @@ class _InventoryScreenState extends State<InventoryScreen> {
   }
 
   void _load() {
+    // TODO: This is a low impact bug
+    // The permanent fix requires converting _load() 
+    // to a proper async method that awaits outside setState,
+    // but that's a bigger refactor touching every screen consistently
     final next = _repo.getAllInventory();
-    if (mounted) setState(() => _future = next);
+    Future.microtask(() {
+      if (mounted) setState(() => _future = next);
+    });
   }
 
   @override

@@ -48,9 +48,13 @@ class _HerdManagementScreenState extends State<HerdManagementScreen>
   void _refresh() {
     final livestock = _repo.getActiveAssets(AssetCategory.livestock);
     final crop      = _repo.getActiveAssets(AssetCategory.crop);
-    setState(() {
-      _livestockFuture = livestock;
-      _cropFuture      = crop;
+    Future.microtask(() {
+      if (mounted) {
+        setState(() {
+        _livestockFuture = livestock;
+        _cropFuture      = crop;
+      });
+      }
     });
   }
 
