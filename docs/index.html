@@ -1,0 +1,1619 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Akavango Farm Manager — Documentation</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=DM+Mono:wght@400;500&family=Lora:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --soil:       #111a13;
+    --bark:       #1c2e1f;
+    --terracotta: #3a7d44;
+    --clay:       #5aab67;
+    --harvest:    #c8a84a;
+    --straw:      #e0f0dc;
+    --fog:        #f0f7ee;
+    --moss:       #2e5e35;
+    --leaf:       #6dbf74;
+    --river:      #4a8c6f;
+    --cream:      #f5fbf4;
+
+    --font-display: 'Playfair Display', Georgia, serif;
+    --font-body:    'Lora', Georgia, serif;
+    --font-mono:    'DM Mono', 'Courier New', monospace;
+
+    --radius: 4px;
+    --shadow: 0 4px 32px rgba(26,18,11,.18);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    background: var(--cream);
+    color: var(--soil);
+    font-family: var(--font-body);
+    font-size: 17px;
+    line-height: 1.7;
+    overflow-x: hidden;
+  }
+
+  /* ─── GRAIN OVERLAY ─── */
+  body::before {
+    content: '';
+    position: fixed; inset: 0; z-index: 999; pointer-events: none;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+    opacity: .5;
+  }
+
+  /* ─── NAV ─── */
+  nav {
+    position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+    background: var(--soil);
+    border-bottom: 2px solid var(--terracotta);
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0 3rem;
+    height: 64px;
+  }
+  .nav-brand {
+    font-family: var(--font-display);
+    font-size: 1.15rem;
+    color: var(--straw);
+    letter-spacing: .04em;
+    text-decoration: none;
+    display: flex; align-items: center; gap: .6rem;
+  }
+  .nav-brand span.accent { color: var(--clay); }
+  .nav-brand .logo-mark {
+    width: 30px; height: 30px;
+    background: var(--terracotta);
+    border-radius: 50% 50% 50% 0;
+    transform: rotate(-45deg);
+    flex-shrink: 0;
+  }
+  .nav-links {
+    display: flex; gap: 2rem; list-style: none;
+  }
+  .nav-links a {
+    color: var(--straw);
+    text-decoration: none;
+    font-family: var(--font-mono);
+    font-size: .82rem;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+    opacity: .75;
+    transition: opacity .2s, color .2s;
+    padding: .25rem 0;
+    border-bottom: 1px solid transparent;
+  }
+  .nav-links a:hover, .nav-links a.active {
+    opacity: 1; color: var(--clay);
+    border-bottom-color: var(--clay);
+  }
+  .nav-badge {
+    background: var(--terracotta);
+    color: #fff;
+    font-family: var(--font-mono);
+    font-size: .68rem;
+    padding: .15rem .55rem;
+    border-radius: 99px;
+    letter-spacing: .04em;
+  }
+
+  /* ─── PAGE SECTIONS ─── */
+  .page { display: none; padding-top: 64px; min-height: 100vh; }
+  .page.active { display: block; }
+
+  /* ─── HERO ─── */
+  .hero {
+    background: var(--soil);
+    min-height: calc(100vh - 64px);
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    overflow: hidden;
+    position: relative;
+  }
+  .hero-left {
+    padding: 7rem 4rem 5rem 5rem;
+    display: flex; flex-direction: column; justify-content: center;
+    position: relative; z-index: 2;
+  }
+  .hero-eyebrow {
+    font-family: var(--font-mono);
+    font-size: .75rem;
+    letter-spacing: .16em;
+    text-transform: uppercase;
+    color: var(--clay);
+    margin-bottom: 1.5rem;
+    display: flex; align-items: center; gap: .8rem;
+  }
+  .hero-eyebrow::before {
+    content: '';
+    width: 2.5rem; height: 1px;
+    background: var(--clay);
+    display: block;
+  }
+  .hero-title {
+    font-family: var(--font-display);
+    font-size: clamp(2.8rem, 5vw, 4.5rem);
+    line-height: 1.1;
+    color: var(--straw);
+    margin-bottom: 1.8rem;
+  }
+  .hero-title em { color: var(--clay); font-style: normal; }
+  .hero-desc {
+    color: rgba(245,230,200,.7);
+    font-size: 1.05rem;
+    max-width: 500px;
+    margin-bottom: 2.8rem;
+    line-height: 1.8;
+  }
+  .hero-ctas { display: flex; gap: 1rem; flex-wrap: wrap; }
+  .btn-primary {
+    background: var(--terracotta);
+    color: #fff;
+    padding: .85rem 2rem;
+    border: none; cursor: pointer;
+    font-family: var(--font-mono);
+    font-size: .82rem;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    text-decoration: none;
+    display: inline-flex; align-items: center; gap: .5rem;
+    transition: background .2s, transform .15s;
+    clip-path: polygon(0 0, calc(100% - 12px) 0, 100% 12px, 100% 100%, 12px 100%, 0 calc(100% - 12px));
+  }
+  .btn-primary:hover { background: var(--clay); transform: translateY(-2px); }
+  .btn-ghost {
+    background: transparent;
+    color: var(--straw);
+    padding: .85rem 2rem;
+    border: 1px solid rgba(245,230,200,.3);
+    cursor: pointer;
+    font-family: var(--font-mono);
+    font-size: .82rem;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    text-decoration: none;
+    display: inline-flex; align-items: center; gap: .5rem;
+    transition: border-color .2s, color .2s;
+  }
+  .btn-ghost:hover { border-color: var(--clay); color: var(--clay); }
+
+  .hero-stats {
+    margin-top: 4rem;
+    display: flex; gap: 2.5rem;
+    border-top: 1px solid rgba(245,230,200,.12);
+    padding-top: 2rem;
+  }
+  .stat-num {
+    font-family: var(--font-display);
+    font-size: 2rem;
+    color: #c8e6b0;
+    line-height: 1;
+  }
+  .stat-label {
+    font-family: var(--font-mono);
+    font-size: .7rem;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    color: rgba(245,230,200,.5);
+    margin-top: .3rem;
+  }
+
+  .hero-right {
+    position: relative;
+    display: flex; align-items: center; justify-content: center;
+    overflow: hidden;
+  }
+  .hero-visual {
+    width: 100%; height: 100%;
+    background: linear-gradient(135deg, #2d1e0f 0%, #1a120b 60%);
+    position: relative;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .hero-visual::before {
+    content: '';
+    position: absolute; inset: 0;
+    background: radial-gradient(ellipse at 30% 50%, rgba(58,125,68,.2) 0%, transparent 70%);
+  }
+  .arch-diagram {
+    width: 380px; height: 420px;
+    position: relative;
+    z-index: 2;
+  }
+
+  /* ─── FEATURES STRIP ─── */
+  .features-strip {
+    background: var(--bark);
+    padding: 1.5rem 5rem;
+    display: flex; gap: 0;
+    overflow: hidden;
+    border-top: 1px solid rgba(58,125,68,.3);
+    border-bottom: 1px solid rgba(58,125,68,.3);
+  }
+  .feature-chip {
+    display: flex; align-items: center; gap: .6rem;
+    padding: 0 2rem;
+    border-right: 1px solid rgba(245,230,200,.1);
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+  .feature-chip:last-child { border-right: none; }
+  .feature-chip .dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--leaf);
+    flex-shrink: 0;
+  }
+  .feature-chip span {
+    font-family: var(--font-mono);
+    font-size: .75rem;
+    letter-spacing: .06em;
+    color: rgba(245,230,200,.6);
+    text-transform: uppercase;
+  }
+
+  /* ─── SECTION STYLES ─── */
+  section { padding: 5rem 5rem; }
+  section + section { padding-top: 0; }
+
+  .section-label {
+    font-family: var(--font-mono);
+    font-size: .72rem;
+    letter-spacing: .18em;
+    text-transform: uppercase;
+    color: var(--terracotta);
+    margin-bottom: 1rem;
+    display: flex; align-items: center; gap: .7rem;
+  }
+  .section-label::before {
+    content: '';
+    width: 1.8rem; height: 1px;
+    background: var(--terracotta);
+  }
+  .section-title {
+    font-family: var(--font-display);
+    font-size: clamp(1.8rem, 3vw, 2.8rem);
+    color: var(--soil);
+    margin-bottom: 1.2rem;
+    line-height: 1.2;
+  }
+  .section-sub {
+    color: #2e4a32;
+    max-width: 620px;
+    margin-bottom: 3rem;
+    font-size: 1rem;
+  }
+
+  /* ─── FEATURE CARDS ─── */
+  .feature-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1.5px;
+    background: var(--straw);
+    border: 1.5px solid var(--straw);
+    overflow: hidden;
+  }
+  .feature-card {
+    background: var(--cream);
+    padding: 2.2rem 2rem;
+    position: relative;
+    transition: background .2s;
+  }
+  .feature-card:hover { background: var(--fog); }
+  .feature-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0;
+    width: 3px; height: 0;
+    background: var(--terracotta);
+    transition: height .3s;
+  }
+  .feature-card:hover::before { height: 100%; }
+  .feature-icon {
+    width: 44px; height: 44px;
+    background: var(--terracotta);
+    border-radius: var(--radius);
+    display: flex; align-items: center; justify-content: center;
+    margin-bottom: 1.2rem;
+    font-size: 1.3rem;
+  }
+  .feature-card h3 {
+    font-family: var(--font-display);
+    font-size: 1.1rem;
+    margin-bottom: .6rem;
+    color: var(--soil);
+  }
+  .feature-card p {
+    font-size: .9rem;
+    color: #2e4a32;
+    line-height: 1.65;
+  }
+
+  /* ─── OVERVIEW HIGHLIGHTS ─── */
+  .highlight-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 4rem;
+    align-items: center;
+    padding: 4rem 5rem;
+  }
+  .highlight-row.flip { direction: rtl; }
+  .highlight-row.flip > * { direction: ltr; }
+  .highlight-img {
+    background: var(--soil);
+    border-radius: 2px;
+    height: 320px;
+    position: relative;
+    overflow: hidden;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .highlight-text h2 {
+    font-family: var(--font-display);
+    font-size: 2rem;
+    color: var(--soil);
+    margin-bottom: 1rem;
+  }
+  .highlight-text p { color: #2e4a32; margin-bottom: 1.2rem; font-size: .97rem; }
+  .tag-list { display: flex; flex-wrap: wrap; gap: .5rem; margin-top: 1.2rem; }
+  .tag {
+    font-family: var(--font-mono);
+    font-size: .7rem;
+    letter-spacing: .06em;
+    padding: .3rem .8rem;
+    background: rgba(58,125,68,.1);
+    color: var(--terracotta);
+    border: 1px solid rgba(58,125,68,.25);
+    border-radius: 2px;
+    text-transform: uppercase;
+  }
+
+  /* ─── GETTING STARTED PAGE ─── */
+  .docs-layout {
+    display: grid;
+    grid-template-columns: 260px 1fr;
+    min-height: calc(100vh - 64px);
+  }
+  .docs-sidebar {
+    background: var(--soil);
+    padding: 2.5rem 0;
+    position: sticky;
+    top: 64px;
+    height: calc(100vh - 64px);
+    overflow-y: auto;
+    border-right: 1px solid rgba(58,125,68,.25);
+  }
+  .sidebar-group { margin-bottom: 2rem; }
+  .sidebar-group-label {
+    font-family: var(--font-mono);
+    font-size: .65rem;
+    letter-spacing: .16em;
+    text-transform: uppercase;
+    color: rgba(245,230,200,.35);
+    padding: 0 1.8rem .6rem;
+  }
+  .sidebar-link {
+    display: block;
+    padding: .55rem 1.8rem;
+    color: rgba(245,230,200,.65);
+    text-decoration: none;
+    font-family: var(--font-mono);
+    font-size: .8rem;
+    transition: color .2s, background .2s;
+    border-left: 2px solid transparent;
+  }
+  .sidebar-link:hover { color: var(--straw); background: rgba(255,255,255,.04); }
+  .sidebar-link.active {
+    color: var(--clay);
+    border-left-color: var(--clay);
+    background: rgba(224,123,57,.07);
+  }
+  .docs-content {
+    padding: 3.5rem 5rem 5rem;
+    max-width: 860px;
+  }
+  .docs-content h1 {
+    font-family: var(--font-display);
+    font-size: 2.4rem;
+    color: var(--soil);
+    margin-bottom: .6rem;
+  }
+  .docs-content .lead {
+    font-size: 1.08rem;
+    color: #2e4a32;
+    margin-bottom: 2.5rem;
+    padding-bottom: 2rem;
+    border-bottom: 1px solid rgba(17,26,19,.12);
+  }
+  .docs-content h2 {
+    font-family: var(--font-display);
+    font-size: 1.5rem;
+    color: var(--soil);
+    margin: 2.5rem 0 .8rem;
+  }
+  .docs-content h3 {
+    font-family: var(--font-mono);
+    font-size: .9rem;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    color: var(--terracotta);
+    margin: 1.8rem 0 .6rem;
+  }
+  .docs-content p { margin-bottom: 1rem; color: #1e3822; font-size: .97rem; }
+  .docs-content ul {
+    margin: .8rem 0 1.2rem 1.4rem;
+    color: #1e3822;
+    font-size: .95rem;
+  }
+  .docs-content ul li { margin-bottom: .4rem; }
+
+  pre, code {
+    font-family: var(--font-mono);
+  }
+  pre {
+    background: var(--soil);
+    color: var(--straw);
+    padding: 1.5rem;
+    border-radius: var(--radius);
+    overflow-x: auto;
+    font-size: .82rem;
+    line-height: 1.7;
+    margin: 1rem 0 1.5rem;
+    border-left: 3px solid var(--terracotta);
+  }
+  code {
+    background: rgba(58,125,68,.1);
+    color: var(--terracotta);
+    padding: .15rem .45rem;
+    border-radius: 2px;
+    font-size: .85em;
+  }
+  pre code {
+    background: none;
+    color: inherit;
+    padding: 0;
+    border-radius: 0;
+    font-size: inherit;
+  }
+
+  .callout {
+    background: rgba(200,168,74,.1);
+    border-left: 3px solid #c8a84a;
+    padding: 1rem 1.4rem;
+    border-radius: 0 var(--radius) var(--radius) 0;
+    margin: 1.2rem 0;
+    font-size: .93rem;
+    color: #1e3822;
+  }
+  .callout.info { border-left-color: var(--river); background: rgba(74,140,111,.08); }
+  .callout.danger { border-left-color: var(--terracotta); background: rgba(58,125,68,.08); }
+  .callout strong { color: var(--soil); }
+
+  .step-list { counter-reset: steps; margin: 1.5rem 0; }
+  .step {
+    display: grid;
+    grid-template-columns: 36px 1fr;
+    gap: 1rem;
+    margin-bottom: 2rem;
+    counter-increment: steps;
+  }
+  .step-num {
+    width: 36px; height: 36px;
+    background: var(--terracotta);
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-family: var(--font-mono);
+    font-size: .78rem;
+    font-weight: 500;
+    color: #fff;
+    flex-shrink: 0;
+    margin-top: .15rem;
+  }
+  .step-body h4 {
+    font-family: var(--font-display);
+    font-size: 1.05rem;
+    color: var(--soil);
+    margin-bottom: .4rem;
+  }
+  .step-body p { font-size: .93rem; margin-bottom: .5rem; }
+
+  /* ─── ARCHITECTURE PAGE ─── */
+  .arch-page { padding: 3.5rem 5rem; }
+  .arch-page h1 {
+    font-family: var(--font-display);
+    font-size: 2.4rem;
+    color: var(--soil);
+    margin-bottom: .6rem;
+  }
+  .arch-page .lead {
+    font-size: 1.05rem; color: #2e4a32;
+    margin-bottom: 2.5rem;
+    padding-bottom: 2rem;
+    border-bottom: 1px solid rgba(17,26,19,.12);
+    max-width: 720px;
+  }
+  .arch-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 2rem;
+    margin-bottom: 3rem;
+  }
+  .arch-card {
+    border: 1px solid rgba(17,26,19,.12);
+    border-radius: var(--radius);
+    overflow: hidden;
+  }
+  .arch-card-header {
+    background: var(--soil);
+    padding: 1rem 1.4rem;
+    display: flex; align-items: center; gap: .8rem;
+  }
+  .arch-card-header .icon { font-size: 1.1rem; }
+  .arch-card-header h3 {
+    font-family: var(--font-mono);
+    font-size: .82rem;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    color: var(--clay);
+  }
+  .arch-card-body { padding: 1.2rem 1.4rem; background: var(--cream); }
+  .arch-card-body p { font-size: .88rem; color: #1e3822; margin-bottom: .8rem; }
+  .arch-card-body ul { margin-left: 1.2rem; color: #1e3822; font-size: .85rem; }
+  .arch-card-body ul li { margin-bottom: .3rem; }
+
+  .collection-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 1.5rem 0 2.5rem;
+    font-size: .87rem;
+  }
+  .collection-table th {
+    background: var(--soil);
+    color: var(--clay);
+    font-family: var(--font-mono);
+    font-size: .72rem;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    padding: .75rem 1rem;
+    text-align: left;
+    font-weight: 500;
+  }
+  .collection-table td {
+    padding: .75rem 1rem;
+    border-bottom: 1px solid rgba(17,26,19,.1);
+    color: #1e3822;
+    vertical-align: top;
+  }
+  .collection-table tr:last-child td { border-bottom: none; }
+  .collection-table tr:hover td { background: rgba(58,125,68,.04); }
+  .collection-table td:first-child { font-family: var(--font-mono); color: var(--terracotta); font-size: .82rem; }
+  .collection-table td:nth-child(2) { font-family: var(--font-mono); font-size: .8rem; color: var(--moss); }
+
+  /* ─── CHANGELOG PAGE ─── */
+  .changelog-page { padding: 3.5rem 5rem; max-width: 820px; }
+  .changelog-page h1 {
+    font-family: var(--font-display);
+    font-size: 2.4rem;
+    color: var(--soil);
+    margin-bottom: .6rem;
+  }
+  .changelog-page .lead {
+    color: #2e4a32;
+    margin-bottom: 2.5rem;
+    padding-bottom: 2rem;
+    border-bottom: 1px solid rgba(17,26,19,.12);
+  }
+  .release {
+    display: grid;
+    grid-template-columns: 160px 1fr;
+    gap: 2.5rem;
+    padding: 2.5rem 0;
+    border-bottom: 1px solid rgba(17,26,19,.1);
+    position: relative;
+  }
+  .release:last-child { border-bottom: none; }
+  .release::before {
+    content: '';
+    position: absolute;
+    left: 155px; top: 0; bottom: 0;
+    width: 1px;
+    background: linear-gradient(to bottom, rgba(58,125,68,.5), rgba(58,125,68,.1));
+  }
+  .release-meta { padding-top: .2rem; }
+  .release-version {
+    font-family: var(--font-display);
+    font-size: 1.5rem;
+    color: var(--terracotta);
+    line-height: 1;
+    margin-bottom: .4rem;
+  }
+  .release-date {
+    font-family: var(--font-mono);
+    font-size: .72rem;
+    letter-spacing: .08em;
+    color: #3a6040;
+    text-transform: uppercase;
+  }
+  .release-badge {
+    display: inline-block;
+    margin-top: .6rem;
+    padding: .2rem .6rem;
+    border-radius: 2px;
+    font-family: var(--font-mono);
+    font-size: .65rem;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+  }
+  .badge-latest { background: rgba(46,94,53,.15); color: var(--moss); border: 1px solid var(--moss); }
+  .badge-beta   { background: rgba(58,125,68,.12); color: var(--terracotta); border: 1px solid var(--terracotta); }
+  .badge-alpha  { background: rgba(59,126,161,.12); color: var(--river); border: 1px solid var(--river); }
+
+  .release-body h3 {
+    font-family: var(--font-display);
+    font-size: 1.3rem;
+    color: var(--soil);
+    margin-bottom: 1rem;
+    padding-top: .1rem;
+  }
+  .change-group { margin-bottom: 1.4rem; }
+  .change-group-label {
+    font-family: var(--font-mono);
+    font-size: .68rem;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    margin-bottom: .5rem;
+    display: flex; align-items: center; gap: .5rem;
+  }
+  .change-group-label.added   { color: var(--moss); }
+  .change-group-label.fixed   { color: var(--river); }
+  .change-group-label.changed { color: var(--harvest); }
+  .change-group-label.known   { color: var(--terracotta); }
+  .change-list { list-style: none; margin: 0; }
+  .change-list li {
+    font-size: .9rem;
+    color: #1e3822;
+    padding: .3rem 0 .3rem 1.2rem;
+    position: relative;
+    border-left: none;
+  }
+  .change-list li::before {
+    content: '—';
+    position: absolute; left: 0;
+    color: rgba(17,26,19,.35);
+    font-size: .8rem;
+  }
+
+  /* ─── FOOTER ─── */
+  footer {
+    background: var(--soil);
+    padding: 3rem 5rem;
+    border-top: 1px solid rgba(58,125,68,.25);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 1rem;
+  }
+  .footer-brand {
+    font-family: var(--font-display);
+    color: var(--straw);
+    font-size: 1.1rem;
+  }
+  .footer-brand span { color: var(--clay); }
+  .footer-meta {
+    font-family: var(--font-mono);
+    font-size: .72rem;
+    color: rgba(245,230,200,.4);
+    letter-spacing: .06em;
+    text-transform: uppercase;
+  }
+  .footer-links { display: flex; gap: 1.5rem; }
+  .footer-links a {
+    font-family: var(--font-mono);
+    font-size: .72rem;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+    color: rgba(245,230,200,.45);
+    text-decoration: none;
+    transition: color .2s;
+  }
+  .footer-links a:hover { color: var(--clay); }
+
+  /* ─── SCROLL ANIMATIONS ─── */
+  .fade-up {
+    opacity: 0;
+    transform: translateY(24px);
+    transition: opacity .5s ease, transform .5s ease;
+  }
+  .fade-up.visible { opacity: 1; transform: translateY(0); }
+
+  /* ─── HAMBURGER BUTTON ─── */
+  .nav-hamburger {
+    display: none;
+    flex-direction: column;
+    justify-content: center;
+    gap: 5px;
+    width: 36px; height: 36px;
+    background: none; border: none;
+    cursor: pointer;
+    padding: 4px;
+    z-index: 200;
+  }
+  .nav-hamburger span {
+    display: block;
+    width: 22px; height: 2px;
+    background: var(--straw);
+    border-radius: 2px;
+    transition: transform .25s, opacity .2s;
+  }
+  .nav-hamburger.open span:nth-child(1) { transform: translateY(7px) rotate(45deg); }
+  .nav-hamburger.open span:nth-child(2) { opacity: 0; }
+  .nav-hamburger.open span:nth-child(3) { transform: translateY(-7px) rotate(-45deg); }
+
+  /* ─── MOBILE DRAWER ─── */
+  .nav-drawer {
+    display: none;
+    position: fixed;
+    top: 64px; left: 0; right: 0; bottom: 0;
+    background: var(--soil);
+    z-index: 99;
+    flex-direction: column;
+    padding: 2rem 1.8rem;
+    border-top: 1px solid rgba(90,171,103,.2);
+    overflow-y: auto;
+  }
+  .nav-drawer.open { display: flex; }
+  .nav-drawer a {
+    display: block;
+    color: var(--straw);
+    text-decoration: none;
+    font-family: var(--font-mono);
+    font-size: 1rem;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+    padding: 1rem 0;
+    border-bottom: 1px solid rgba(90,171,103,.1);
+    transition: color .2s;
+  }
+  .nav-drawer a:hover, .nav-drawer a.active { color: var(--clay); }
+  .nav-drawer .nav-badge {
+    margin-top: 2rem;
+    align-self: flex-start;
+  }
+
+  /* ─── TABLE SCROLL WRAPPER ─── */
+  .table-scroll {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    margin: 1.5rem 0 2.5rem;
+    border-radius: var(--radius);
+  }
+  .table-scroll .collection-table { margin: 0; }
+
+  /* ─── RESPONSIVE: TABLET (≤1024px) ─── */
+  @media (max-width: 1024px) {
+    .docs-layout { grid-template-columns: 220px 1fr; }
+    .docs-content { padding: 2.5rem 2.5rem; }
+    section { padding: 4rem 3rem; }
+    .hero-left { padding: 5rem 3rem 4rem; }
+    .highlight-row { padding: 4rem 3rem; }
+    .arch-page, .changelog-page { padding: 2.5rem 3rem; }
+  }
+
+  /* ─── RESPONSIVE: MOBILE (≤768px) ─── */
+  @media (max-width: 768px) {
+    /* Nav */
+    nav { padding: 0 1.2rem; }
+    .nav-links { display: none; }
+    .nav-hamburger { display: flex; }
+
+    /* Hero */
+    .hero { grid-template-columns: 1fr; min-height: auto; }
+    .hero-right { display: none; }
+    .hero-left {
+      padding: 3.5rem 1.4rem 3rem;
+    }
+    .hero-title { font-size: 2.2rem; }
+    .hero-desc { font-size: .97rem; }
+    .hero-ctas { flex-direction: column; gap: .75rem; }
+    .btn-primary, .btn-ghost { justify-content: center; text-align: center; }
+    .hero-stats { gap: 1.5rem; flex-wrap: wrap; }
+    .stat-num { font-size: 1.6rem; }
+
+    /* Features strip — horizontal scroll */
+    .features-strip {
+      padding: .9rem 1rem;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+      flex-wrap: nowrap;
+      scrollbar-width: none;
+    }
+    .features-strip::-webkit-scrollbar { display: none; }
+    .feature-chip { padding: 0 1.2rem; }
+
+    /* Sections */
+    section { padding: 2.5rem 1.4rem; }
+    .section-title { font-size: 1.6rem; }
+
+    /* Feature grid — 1 col */
+    .feature-grid { grid-template-columns: 1fr; gap: 1px; }
+
+    /* Highlight row */
+    .highlight-row {
+      grid-template-columns: 1fr;
+      gap: 1.8rem;
+      padding: 2.5rem 1.4rem;
+    }
+    .highlight-row.flip { direction: ltr; }
+    .highlight-img { height: 200px; }
+
+    /* Docs layout — stack */
+    .docs-layout { grid-template-columns: 1fr; }
+    .docs-sidebar {
+      position: static;
+      height: auto;
+      border-right: none;
+      border-bottom: 1px solid rgba(90,171,103,.2);
+      padding: 1.2rem 0;
+    }
+    .docs-content { padding: 1.8rem 1.4rem 3rem; }
+    .docs-content h1 { font-size: 1.8rem; }
+    .docs-content h2 { font-size: 1.25rem; }
+
+    /* Step list */
+    .step { grid-template-columns: 28px 1fr; gap: .8rem; }
+    .step-num { width: 28px; height: 28px; font-size: .72rem; }
+
+    /* Architecture page */
+    .arch-page { padding: 1.8rem 1.4rem; }
+    .arch-page h1 { font-size: 1.8rem; }
+    .arch-grid { grid-template-columns: 1fr; gap: 1rem; }
+
+    /* Tables — scrollable */
+    .collection-table { min-width: 540px; }
+
+    /* Changelog */
+    .changelog-page { padding: 1.8rem 1.4rem; max-width: 100%; }
+    .changelog-page h1 { font-size: 1.8rem; }
+    .release { grid-template-columns: 1fr; gap: 1rem; }
+    .release::before { display: none; }
+    .release-version { font-size: 1.2rem; }
+    .release-meta { display: flex; flex-wrap: wrap; align-items: center; gap: .6rem; padding-top: 0; }
+
+    /* Pre / code blocks */
+    pre { font-size: .78rem; padding: 1rem; }
+
+    /* Footer */
+    footer {
+      padding: 2rem 1.4rem;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 1.2rem;
+    }
+    .footer-links { flex-wrap: wrap; gap: 1rem; }
+  }
+
+  /* ─── RESPONSIVE: SMALL PHONES (≤380px) ─── */
+  @media (max-width: 380px) {
+    .hero-title { font-size: 1.85rem; }
+    .hero-left { padding: 3rem 1rem 2.5rem; }
+    section { padding: 2rem 1rem; }
+    .docs-content, .arch-page, .changelog-page { padding: 1.4rem 1rem; }
+    .btn-primary, .btn-ghost { font-size: .75rem; padding: .75rem 1.2rem; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ══════════════════════════ NAV ══════════════════════════ -->
+<nav>
+  <a href="#" class="nav-brand" onclick="showPage('home')">
+    <div class="logo-mark"></div>
+    Akavango <span class="accent">Farm</span>
+  </a>
+  <ul class="nav-links">
+    <li><a href="#" onclick="showPage('home')" id="nav-home" class="active">Overview</a></li>
+    <li><a href="#" onclick="showPage('start')" id="nav-start">Getting Started</a></li>
+    <li><a href="#" onclick="showPage('arch')" id="nav-arch">Architecture</a></li>
+    <li><a href="#" onclick="showPage('changelog')" id="nav-changelog">Changelog</a></li>
+    <li><span class="nav-badge">Beta v0.1</span></li>
+  </ul>
+  <button class="nav-hamburger" id="hamburger" aria-label="Toggle menu" onclick="toggleDrawer()">
+    <span></span><span></span><span></span>
+  </button>
+</nav>
+
+<!-- Mobile drawer -->
+<div class="nav-drawer" id="nav-drawer">
+  <a href="#" onclick="showPage('home');closeDrawer()" id="drawer-home">Overview</a>
+  <a href="#" onclick="showPage('start');closeDrawer()" id="drawer-start">Getting Started</a>
+  <a href="#" onclick="showPage('arch');closeDrawer()" id="drawer-arch">Architecture</a>
+  <a href="#" onclick="showPage('changelog');closeDrawer()" id="drawer-changelog">Changelog</a>
+  <span class="nav-badge">Beta v0.1</span>
+</div>
+
+<!-- ══════════════════════════ HOME ══════════════════════════ -->
+<div id="page-home" class="page active">
+
+  <!-- HERO -->
+  <div class="hero">
+    <div class="hero-left">
+      <div class="hero-eyebrow">Flutter · Appwrite · Local-First</div>
+      <h1 class="hero-title">Farm management built for the <em>field.</em></h1>
+      <p class="hero-desc">Akavango Farm Manager is an Android-first mobile app that tracks livestock, inventory, milk logs, finances, and field activity — fully offline, syncing when you're back in range.</p>
+      <div class="hero-ctas">
+        <a href="#" class="btn-primary" onclick="showPage('start')">↓ Get Started</a>
+        <a href="#" class="btn-ghost" onclick="showPage('arch')">Architecture →</a>
+      </div>
+      <div class="hero-stats">
+        <div class="stat-item">
+          <div class="stat-num">9</div>
+          <div class="stat-label">Sync Collections</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-num">100%</div>
+          <div class="stat-label">Offline-First</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-num">SQLite</div>
+          <div class="stat-label">Local Truth</div>
+        </div>
+      </div>
+    </div>
+    <div class="hero-right">
+      <div class="hero-visual">
+        <svg class="arch-diagram" viewBox="0 0 380 420" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <!-- Phone silhouette -->
+          <rect x="110" y="20" width="160" height="280" rx="18" fill="#1c2e1f" stroke="#3a7d44" stroke-width="1.5"/>
+          <rect x="120" y="35" width="140" height="250" rx="10" fill="#111a13"/>
+          <!-- Screen content -->
+          <rect x="130" y="48" width="80" height="10" rx="3" fill="#3a7d44" opacity=".8"/>
+          <rect x="218" y="48" width="32" height="10" rx="3" fill="#2e5e35" opacity=".6"/>
+          <rect x="130" y="68" width="120" height="42" rx="4" fill="#1c2e1f" stroke="#3a7d44" stroke-width=".8"/>
+          <text x="138" y="84" font-family="DM Mono,monospace" font-size="8" fill="#5aab67">HERD SUMMARY</text>
+          <text x="138" y="97" font-family="DM Mono,monospace" font-size="7" fill="rgba(224,240,220,.5)">24 head · 3 calves</text>
+          <rect x="130" y="118" width="56" height="40" rx="3" fill="#1c2e1f" stroke="#2e5e35" stroke-width=".8"/>
+          <text x="138" y="133" font-family="DM Mono,monospace" font-size="7" fill="#6dbf74">MILK LOG</text>
+          <text x="138" y="147" font-family="DM Mono,monospace" font-size="9" fill="#c8e6b0">142 L</text>
+          <rect x="194" y="118" width="56" height="40" rx="3" fill="#1c2e1f" stroke="#4a8c6f" stroke-width=".8"/>
+          <text x="202" y="133" font-family="DM Mono,monospace" font-size="7" fill="#4a8c6f">FINANCE</text>
+          <text x="202" y="147" font-family="DM Mono,monospace" font-size="9" fill="#c8e6b0">+4,200</text>
+          <!-- Sync indicator -->
+          <circle cx="250" cy="195" r="5" fill="#6dbf74" opacity=".9">
+            <animate attributeName="opacity" values="0.9;0.3;0.9" dur="2s" repeatCount="indefinite"/>
+          </circle>
+          <text x="235" y="212" font-family="DM Mono,monospace" font-size="7" fill="rgba(224,240,220,.4)">SYNCED</text>
+          <!-- Bottom indicator -->
+          <rect x="165" y="290" width="50" height="4" rx="2" fill="#3a7d44" opacity=".6"/>
+          <!-- Appwrite cloud below -->
+          <rect x="80" y="330" width="220" height="60" rx="6" fill="#1c2e1f" stroke="#3a7d44" stroke-width="1"/>
+          <text x="122" y="355" font-family="DM Mono,monospace" font-size="9" fill="#5aab67">APPWRITE CLOUD</text>
+          <text x="108" y="373" font-family="DM Mono,monospace" font-size="7" fill="rgba(224,240,220,.4)">fra.cloud.appwrite.io · v1.8.1</text>
+          <!-- Sync arrows -->
+          <path d="M190 300 L190 328" stroke="#3a7d44" stroke-width="1" stroke-dasharray="4 3" marker-end="url(#arr)"/>
+          <defs>
+            <marker id="arr" markerWidth="6" markerHeight="6" refX="3" refY="3" orient="auto">
+              <path d="M0,0 L6,3 L0,6 Z" fill="#3a7d44"/>
+            </marker>
+          </defs>
+          <animateTransform attributeName="transform" attributeType="XML" type="translate" values="0,0;0,-4;0,0" dur="3s" repeatCount="indefinite" additive="sum"/>
+        </svg>
+      </div>
+    </div>
+  </div>
+
+  <!-- FEATURES STRIP -->
+  <div class="features-strip">
+    <div class="feature-chip"><div class="dot"></div><span>Offline-first SQLite</span></div>
+    <div class="feature-chip"><div class="dot"></div><span>Transactional outbox sync</span></div>
+    <div class="feature-chip"><div class="dot" style="background:var(--harvest)"></div><span>Conflict detection</span></div>
+    <div class="feature-chip"><div class="dot" style="background:var(--river)"></div><span>Photo capture + compression</span></div>
+    <div class="feature-chip"><div class="dot"></div><span>M-Pesa ready</span></div>
+    <div class="feature-chip"><div class="dot" style="background:var(--harvest)"></div><span>PIN auth layer</span></div>
+  </div>
+
+  <!-- WHAT IT DOES -->
+  <section style="background:var(--fog);">
+    <div class="section-label">Platform Overview</div>
+    <h2 class="section-title">Everything a farm operation needs</h2>
+    <p class="section-sub">Designed for low-connectivity environments, Akavango keeps all your data local first and syncs intelligently when a connection is available.</p>
+    <div class="feature-grid">
+      <div class="feature-card fade-up">
+        <div class="feature-icon">🐄</div>
+        <h3>Asset Management</h3>
+        <p>Track livestock and crops with full activity logs. Photo capture on registration, events logged per asset with timestamps.</p>
+      </div>
+      <div class="feature-card fade-up">
+        <div class="feature-icon">🥛</div>
+        <h3>Milk Logging</h3>
+        <p>Session-by-session milk logs linked to individual animals. Live dashboard shows daily totals and trends.</p>
+      </div>
+      <div class="feature-card fade-up">
+        <div class="feature-icon">📦</div>
+        <h3>Inventory Control</h3>
+        <p>Feed, medicine, and equipment tracking with edit support. Know what's in stock before heading to the field.</p>
+      </div>
+      <div class="feature-card fade-up">
+        <div class="feature-icon">💰</div>
+        <h3>Financial Records</h3>
+        <p>Sales and purchases with partial payment support. Instalment tracking across multiple payment milestones.</p>
+      </div>
+      <div class="feature-card fade-up">
+        <div class="feature-icon">🔄</div>
+        <h3>Bidirectional Sync</h3>
+        <p>Outbox pattern ensures zero data loss. Sync fires on connectivity restore, on app unlock, and on a 1000s heartbeat.</p>
+      </div>
+      <div class="feature-card fade-up">
+        <div class="feature-icon">🔒</div>
+        <h3>Secure &amp; Private</h3>
+        <p>PIN auth layer on top of Appwrite sessions. Credentials stored via <code>flutter_secure_storage</code>. Each user scoped by <code>created_by</code>.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- HOW SYNC WORKS -->
+  <div class="highlight-row">
+    <div class="highlight-img" style="background: var(--soil);">
+      <svg viewBox="0 0 300 200" width="280" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <!-- Outbox flow diagram -->
+        <rect x="10" y="75" width="80" height="50" rx="4" fill="#1c2e1f" stroke="#3a7d44" stroke-width="1.2"/>
+        <text x="22" y="97" font-family="DM Mono,monospace" font-size="8" fill="#5aab67">WRITE</text>
+        <text x="22" y="111" font-family="DM Mono,monospace" font-size="7" fill="rgba(224,240,220,.4)">SQLite</text>
+        <path d="M92 100 L118 100" stroke="#3a7d44" stroke-width="1.2" marker-end="url(#a2)"/>
+        <rect x="120" y="75" width="80" height="50" rx="4" fill="#1c2e1f" stroke="#c8a84a" stroke-width="1.2"/>
+        <text x="130" y="97" font-family="DM Mono,monospace" font-size="8" fill="#c8a84a">QUEUE</text>
+        <text x="130" y="111" font-family="DM Mono,monospace" font-size="7" fill="rgba(224,240,220,.4)">sync_queue</text>
+        <path d="M202 100 L228 100" stroke="#c8a84a" stroke-width="1.2" marker-end="url(#a3)"/>
+        <rect x="230" y="75" width="60" height="50" rx="4" fill="#1c2e1f" stroke="#6dbf74" stroke-width="1.2"/>
+        <text x="240" y="97" font-family="DM Mono,monospace" font-size="8" fill="#6dbf74">PUSH</text>
+        <text x="240" y="111" font-family="DM Mono,monospace" font-size="7" fill="rgba(224,240,220,.4)">Appwrite</text>
+        <!-- Down arrow -->
+        <path d="M260 155 L260 128" stroke="#4a8c6f" stroke-width="1" stroke-dasharray="4 3" marker-end="url(#a4)"/>
+        <text x="210" y="172" font-family="DM Mono,monospace" font-size="7" fill="#4a8c6f">DOWN-SYNC (cursor-based)</text>
+        <defs>
+          <marker id="a2" markerWidth="6" markerHeight="6" refX="3" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="#3a7d44"/></marker>
+          <marker id="a3" markerWidth="6" markerHeight="6" refX="3" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="#c8a84a"/></marker>
+          <marker id="a4" markerWidth="6" markerHeight="6" refX="3" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="#4a8c6f"/></marker>
+        </defs>
+      </svg>
+    </div>
+    <div class="highlight-text">
+      <div class="section-label">Sync Architecture</div>
+      <h2>Write local, sync smart</h2>
+      <p>Every write hits SQLite immediately — the app never waits for a network round-trip. A <code>sync_queue</code> outbox table records each pending operation. <code>SyncService</code> drains the queue when connectivity is available.</p>
+      <p>Down-sync uses cursor-based pagination to pull all nine collections from Appwrite after every up-sync pass. Conflicts are resolved with "Appwrite wins" and logged to <code>sync_conflicts</code> for audit.</p>
+      <div class="tag-list">
+        <span class="tag">Outbox Pattern</span>
+        <span class="tag">Cursor Pagination</span>
+        <span class="tag">Conflict Audit</span>
+        <span class="tag">1000s Heartbeat</span>
+      </div>
+    </div>
+  </div>
+
+  <footer>
+    <div class="footer-brand">Akavango <span>Farm</span> Manager</div>
+    <div class="footer-links">
+      <a href="#" onclick="showPage('start')">Docs</a>
+      <a href="#" onclick="showPage('changelog')">Changelog</a>
+      <a href="#" onclick="showPage('arch')">Architecture</a>
+    </div>
+    <div class="footer-meta">Beta v0.1.0 · Appwrite 1.8.1 · Flutter SDK</div>
+  </footer>
+</div>
+
+<!-- ══════════════════════════ GETTING STARTED ══════════════════════════ -->
+<div id="page-start" class="page">
+<div class="docs-layout">
+  <aside class="docs-sidebar">
+    <div class="sidebar-group">
+      <div class="sidebar-group-label">Introduction</div>
+      <a href="#" class="sidebar-link active" onclick="scrollDoc('gs-intro')">Overview</a>
+      <a href="#" class="sidebar-link" onclick="scrollDoc('gs-prereq')">Prerequisites</a>
+    </div>
+    <div class="sidebar-group">
+      <div class="sidebar-group-label">Installation</div>
+      <a href="#" class="sidebar-link" onclick="scrollDoc('gs-flutter')">Flutter Setup</a>
+      <a href="#" class="sidebar-link" onclick="scrollDoc('gs-appwrite')">Appwrite Console</a>
+      <a href="#" class="sidebar-link" onclick="scrollDoc('gs-env')">Environment Config</a>
+    </div>
+    <div class="sidebar-group">
+      <div class="sidebar-group-label">Run & Build</div>
+      <a href="#" class="sidebar-link" onclick="scrollDoc('gs-run')">First Run</a>
+      <a href="#" class="sidebar-link" onclick="scrollDoc('gs-build')">Release Build</a>
+    </div>
+    <div class="sidebar-group">
+      <div class="sidebar-group-label">Reference</div>
+      <a href="#" class="sidebar-link" onclick="scrollDoc('gs-envvars')">All Config Values</a>
+      <a href="#" class="sidebar-link" onclick="scrollDoc('gs-known')">Known Issues</a>
+    </div>
+  </aside>
+  <main class="docs-content">
+    <h1 id="gs-intro">Getting Started</h1>
+    <p class="lead">Get Akavango Farm Manager running on your Android device. The app targets Android-first (tested on TECNO KD7) with iOS-ready architecture. Appwrite Cloud (Frankfurt region) handles the backend — you'll need a free Appwrite account.</p>
+
+    <h2 id="gs-prereq">Prerequisites</h2>
+    <ul>
+      <li>Flutter SDK <strong>≥ 3.19</strong> (<code>flutter --version</code> to check)</li>
+      <li>Dart SDK included with Flutter</li>
+      <li>Android Studio or VS Code with Flutter extension</li>
+      <li>Android device or emulator — API level 23 (Android 6) minimum</li>
+      <li>An <a href="https://cloud.appwrite.io" style="color:var(--terracotta)">Appwrite Cloud</a> account (free tier works)</li>
+      <li>Git</li>
+    </ul>
+
+    <div class="callout info"><strong>iOS note:</strong> The architecture is iOS-ready. You'll need Xcode on macOS and an Apple Developer account for device builds.</div>
+
+    <h2 id="gs-flutter">Flutter Setup</h2>
+    <div class="step-list">
+      <div class="step">
+        <div class="step-num">1</div>
+        <div class="step-body">
+          <h4>Clone the repository</h4>
+          <pre><code>git clone https://github.com/your-org/akavango-farm.git
+cd akavango-farm</code></pre>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">2</div>
+        <div class="step-body">
+          <h4>Install dependencies</h4>
+          <pre><code>flutter pub get</code></pre>
+          <p>Key packages from <code>pubspec.yaml</code>:</p>
+          <ul>
+            <li><code>appwrite: ^21.0.0</code> — Appwrite Dart/Flutter SDK</li>
+            <li><code>sqflite</code> — SQLite local database</li>
+            <li><code>image_picker</code> — Camera and gallery access</li>
+            <li><code>flutter_image_compress</code> — JPEG compression to ~200KB</li>
+            <li><code>flutter_secure_storage</code> — Session persistence</li>
+          </ul>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">3</div>
+        <div class="step-body">
+          <h4>Verify Flutter doctor</h4>
+          <pre><code>flutter doctor -v</code></pre>
+          <p>All Android toolchain items should show ✓. Xcode warnings are acceptable if targeting Android only.</p>
+        </div>
+      </div>
+    </div>
+
+    <h2 id="gs-appwrite">Appwrite Console Setup</h2>
+    <p>Log in to <strong>cloud.appwrite.io</strong>, select your project, and confirm the following are created:</p>
+
+    <h3>Project &amp; Database IDs</h3>
+    <pre><code>Project ID : 69a53fb00009c20573d6
+Database ID: 69a6d9c9002f3a1c4d7a
+Endpoint   : https://fra.cloud.appwrite.io/v1</code></pre>
+
+    <h3>Required Collections</h3>
+    <p>All collections live in the same database. Create each with these primary keys:</p>
+    <div class="table-scroll"><table class="collection-table">
+      <thead><tr><th>Collection ID</th><th>Primary Key</th><th>Notes</th></tr></thead>
+      <tbody>
+        <tr><td>ledger_entries</td><td>event_id</td><td>Append-only truth log</td></tr>
+        <tr><td>assets</td><td>asset_id</td><td>Livestock + crops</td></tr>
+        <tr><td>inventory</td><td>item_id</td><td>Feed, medicine, equipment</td></tr>
+        <tr><td>financials</td><td>transaction_id</td><td>Sales + purchases</td></tr>
+        <tr><td>partial_payments</td><td>payment_id</td><td>Instalments on a financial record</td></tr>
+        <tr><td>asset_events</td><td>event_id</td><td>Activity log per asset</td></tr>
+        <tr><td>milk_logs</td><td>log_id</td><td>Milk sessions</td></tr>
+        <tr><td>asset_images</td><td>image_id</td><td>⚠️ Must be created manually — see below</td></tr>
+        <tr><td>sync_conflicts</td><td>conflict_id</td><td>Conflict audit log</td></tr>
+      </tbody>
+    </table></div>
+
+    <div class="callout danger"><strong>Important:</strong> The <code>asset_images</code> collection must be created in the Appwrite Console before image sync works end-to-end. It is not auto-provisioned.</div>
+
+    <h3>Required Indexes (on every collection)</h3>
+    <pre><code>created_by  → Key ASC
+created_at  → Key ASC</code></pre>
+
+    <h3>Storage Bucket</h3>
+    <pre><code>Bucket ID  : asset-images
+Max size   : 200 KB per file
+Allowed    : image/jpeg</code></pre>
+
+    <h2 id="gs-env">Environment Config</h2>
+    <p>Create a <code>lib/config/app_config.dart</code> file (gitignored) with your Appwrite credentials:</p>
+    <pre><code>class AppConfig {
+  static const String endpoint   = 'https://fra.cloud.appwrite.io/v1';
+  static const String projectId  = '69a53fb00009c20573d6';
+  static const String databaseId = '69a6d9c9002f3a1c4d7a';
+  static const String bucketId   = 'asset-images';
+}</code></pre>
+
+    <div class="callout"><strong>Tip:</strong> Never commit real credentials to a public repo. Use a <code>.env</code> file + <code>flutter_dotenv</code>, or CI/CD secrets for production builds.</div>
+
+    <h2 id="gs-run">First Run</h2>
+    <div class="step-list">
+      <div class="step">
+        <div class="step-num">1</div>
+        <div class="step-body">
+          <h4>Connect your Android device</h4>
+          <p>Enable USB debugging in Developer Options. Confirm device is visible:</p>
+          <pre><code>flutter devices</code></pre>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">2</div>
+        <div class="step-body">
+          <h4>Launch the app</h4>
+          <pre><code>flutter run --debug</code></pre>
+          <p>On first launch the app creates the local SQLite schema (version 1 — fresh install only, no migrations in beta). You'll be prompted to set a PIN.</p>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">3</div>
+        <div class="step-body">
+          <h4>Verify sync</h4>
+          <p>After logging in, watch the sync banner at the bottom of the home screen. Long-press it to open the conflict viewer.</p>
+        </div>
+      </div>
+    </div>
+
+    <h2 id="gs-build">Release Build</h2>
+    <pre><code># Android APK
+flutter build apk --release --split-per-abi
+
+# Android App Bundle (Play Store)
+flutter build appbundle --release</code></pre>
+    <p>Output APKs will be in <code>build/app/outputs/flutter-apk/</code>. The <code>--split-per-abi</code> flag produces separate APKs for arm64, armeabi-v7a, and x86_64 — use the <code>arm64-v8a</code> build for modern devices including the TECNO KD7.</p>
+
+    <h2 id="gs-envvars">All Config Values</h2>
+    <div class="table-scroll"><table class="collection-table">
+      <thead><tr><th>Key</th><th>Value</th><th>Where used</th></tr></thead>
+      <tbody>
+        <tr><td>endpoint</td><td>https://fra.cloud.appwrite.io/v1</td><td>Appwrite SDK init</td></tr>
+        <tr><td>projectId</td><td>69a53fb00009c20573d6</td><td>Appwrite SDK init</td></tr>
+        <tr><td>databaseId</td><td>69a6d9c9002f3a1c4d7a</td><td>All DB calls</td></tr>
+        <tr><td>bucketId</td><td>asset-images</td><td>ImageSyncService</td></tr>
+        <tr><td>syncTickMs</td><td>1000000 (1000s)</td><td>AppRefreshService</td></tr>
+        <tr><td>maxImageBytes</td><td>204800 (200KB)</td><td>flutter_image_compress</td></tr>
+        <tr><td>sqliteVersion</td><td>1</td><td>sqflite, fresh install</td></tr>
+      </tbody>
+    </table></div>
+
+    <h2 id="gs-known">Known Issues</h2>
+    <div class="callout danger">
+      <strong>setState Future warning</strong> — <code>_InventoryScreenState._load</code> and several other screens call async methods inside <code>setState()</code>. Non-fatal and cosmetic; a refactor of all screen loaders is planned for the next sprint.
+    </div>
+    <div class="callout">
+      <strong>M-Pesa no-receipt path</strong> — Partial payments via M-Pesa are unsupported when no receipt exists. A "manual M-Pesa entry" option is on the roadmap.
+    </div>
+    <div class="callout info">
+      <strong>asset_images collection</strong> — Must be manually created in the Appwrite Console. Image sync will fail silently until this collection exists.
+    </div>
+  </main>
+</div>
+</div>
+
+<!-- ══════════════════════════ ARCHITECTURE ══════════════════════════ -->
+<div id="page-arch" class="page">
+<div class="arch-page">
+  <div class="section-label">Technical Reference</div>
+  <h1>Architecture</h1>
+  <p class="lead">Akavango is built on a local-first principle: the SQLite database is the single source of truth on-device, and Appwrite Cloud is the sync target — never the primary data store. This section covers the full service graph, data flow, and schema.</p>
+
+  <h2>Service Architecture</h2>
+  <div class="arch-grid">
+    <div class="arch-card">
+      <div class="arch-card-header"><span class="icon">🔄</span><h3>SyncService</h3></div>
+      <div class="arch-card-body">
+        <p>Drains the <code>sync_queue</code> outbox table to Appwrite Database. Fires on connectivity restore, on PIN unlock, and on the 1000s heartbeat from <code>AppRefreshService</code>.</p>
+        <ul>
+          <li>Reads pending rows from <code>sync_queue</code></li>
+          <li>Upserts each record to its Appwrite collection</li>
+          <li>Marks queue row as processed on success</li>
+          <li>Triggers <code>DownSyncService</code> after completion</li>
+        </ul>
+      </div>
+    </div>
+    <div class="arch-card">
+      <div class="arch-card-header"><span class="icon">⬇️</span><h3>DownSyncService</h3></div>
+      <div class="arch-card-body">
+        <p>Cursor-based pull of all 9 collections from Appwrite. Uses <code>sync_meta</code> table to persist per-collection cursors so only new/updated documents are fetched.</p>
+        <ul>
+          <li>Reads last cursor from <code>sync_meta</code></li>
+          <li>Fetches pages sorted by <code>created_at ASC</code></li>
+          <li>Writes to SQLite, detects conflicts</li>
+          <li>Logs conflicts to <code>sync_conflicts</code></li>
+        </ul>
+      </div>
+    </div>
+    <div class="arch-card">
+      <div class="arch-card-header"><span class="icon">⏱️</span><h3>AppRefreshService</h3></div>
+      <div class="arch-card-body">
+        <p>Drives the background heartbeat. Exposes a stream that fires twice per tick — once before and once after sync — so UI layers can show a loading state cleanly.</p>
+        <ul>
+          <li>1000s periodic tick</li>
+          <li>Immediate tick on app unlock</li>
+          <li>Pre + post sync stream events</li>
+        </ul>
+      </div>
+    </div>
+    <div class="arch-card">
+      <div class="arch-card-header"><span class="icon">📸</span><h3>ImageService + ImageSyncService</h3></div>
+      <div class="arch-card-body">
+        <p>Two-stage image pipeline. <code>ImageService</code> handles capture and local persistence. <code>ImageSyncService</code> handles upload and metadata push.</p>
+        <ul>
+          <li>Pick → compress (JPEG, ≤200KB) → cache → SQLite row</li>
+          <li>Queue file for upload to <code>asset-images</code> bucket</li>
+          <li>Push metadata to <code>asset_images</code> collection</li>
+          <li>Download thumbnails on down-sync</li>
+        </ul>
+      </div>
+    </div>
+    <div class="arch-card">
+      <div class="arch-card-header"><span class="icon">🔐</span><h3>SessionManager + PinService</h3></div>
+      <div class="arch-card-body">
+        <p>Two-layer auth. Appwrite handles cloud sessions; PIN provides local unlock without requiring network.</p>
+        <ul>
+          <li><code>SessionManager</code> — holds <code>userId</code> in memory</li>
+          <li>Restored from <code>flutter_secure_storage</code> on start</li>
+          <li><code>PinService</code> — hashes PIN into <code>auth_config</code> table</li>
+          <li>PIN unlock triggers immediate sync tick</li>
+        </ul>
+      </div>
+    </div>
+    <div class="arch-card">
+      <div class="arch-card-header"><span class="icon">🗄️</span><h3>Local SQLite Schema</h3></div>
+      <div class="arch-card-body">
+        <p>Version 1 (beta — no migrations). All collections mirror the Appwrite schema plus local-only housekeeping tables.</p>
+        <ul>
+          <li><code>sync_queue</code> — outbox for up-sync</li>
+          <li><code>sync_meta</code> — per-collection down-sync cursors</li>
+          <li><code>auth_config</code> — hashed PIN store</li>
+          <li>All 9 collection tables (mirrored from Appwrite)</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <h2>Data Flow</h2>
+  <pre><code>User Action
+    │
+    ▼
+SQLite (immediate write)
+    │
+    ├─► sync_queue (outbox row appended)
+    │
+    ▼  [on connect / unlock / tick]
+SyncService.processQueue()
+    │
+    ├─► Appwrite Database (upsert per collection)
+    │
+    ▼  [after up-sync]
+DownSyncService.pull()
+    │
+    ├─► Appwrite (cursor-paged GET per collection)
+    ├─► SQLite (write new/updated rows)
+    └─► sync_conflicts (on version mismatch → Appwrite wins)</code></pre>
+
+  <h2>Appwrite Collections</h2>
+  <div class="table-scroll"><table class="collection-table">
+    <thead><tr><th>Collection ID</th><th>Primary Key</th><th>Role</th></tr></thead>
+    <tbody>
+      <tr><td>ledger_entries</td><td>event_id</td><td>Append-only audit / truth log. Never updated, only inserted.</td></tr>
+      <tr><td>assets</td><td>asset_id</td><td>Livestock + crop records with photo references.</td></tr>
+      <tr><td>inventory</td><td>item_id</td><td>Feed, medicine, equipment. Supports edit.</td></tr>
+      <tr><td>financials</td><td>transaction_id</td><td>Sales and purchases. Supports partial payment linkage.</td></tr>
+      <tr><td>partial_payments</td><td>payment_id</td><td>Instalments referencing a <code>financials</code> record.</td></tr>
+      <tr><td>asset_events</td><td>event_id</td><td>Per-asset activity log (vaccinations, treatments, etc.).</td></tr>
+      <tr><td>milk_logs</td><td>log_id</td><td>Individual milk sessions linked to an asset.</td></tr>
+      <tr><td>asset_images</td><td>image_id</td><td>Image metadata. File lives in Storage bucket; this stores reference + thumbnail URL.</td></tr>
+      <tr><td>sync_conflicts</td><td>conflict_id</td><td>Conflict audit. Written by DownSyncService when Appwrite version overwrites local.</td></tr>
+    </tbody>
+  </table></div>
+
+  <h2>Conflict Resolution Policy</h2>
+  <div class="callout">
+    <strong>Appwrite wins.</strong> When a down-sync document has a newer <code>updated_at</code> than the local SQLite row, the Appwrite version overwrites the local record. The overwritten local values are recorded in <code>sync_conflicts</code> with a <code>conflict_id</code> for full audit. Users can review conflicts via the long-press menu on the sync banner.
+  </div>
+
+  <h2>Deferred &amp; Roadmap Items</h2>
+  <div class="table-scroll"><table class="collection-table">
+    <thead><tr><th>Item</th><th>Status</th><th>Notes</th></tr></thead>
+    <tbody>
+      <tr><td>setState Future warning</td><td><span style="color:var(--harvest);font-family:var(--font-mono);font-size:.8rem">COSMETIC</span></td><td>Async refactor needed across all screen loaders</td></tr>
+      <tr><td>M-Pesa manual entry</td><td><span style="color:var(--terracotta);font-family:var(--font-mono);font-size:.8rem">PLANNED</span></td><td>No-receipt M-Pesa payments not yet supported</td></tr>
+      <tr><td>asset_images collection</td><td><span style="color:var(--river);font-family:var(--font-mono);font-size:.8rem">MANUAL</span></td><td>Must be created in Console; not auto-provisioned</td></tr>
+      <tr><td>SQLite migrations</td><td><span style="color:var(--harvest);font-family:var(--font-mono);font-size:.8rem">BETA ONLY</span></td><td>Schema v1 only — beta, fresh-install assumption</td></tr>
+    </tbody>
+  </table></div>
+</div>
+</div>
+
+<!-- ══════════════════════════ CHANGELOG ══════════════════════════ -->
+<div id="page-changelog" class="page">
+<div class="changelog-page">
+  <div class="section-label">Release History</div>
+  <h1>Changelog</h1>
+  <p class="lead">All notable changes to Akavango Farm Manager are documented here. The project follows <a href="https://semver.org" style="color:var(--terracotta)">Semantic Versioning</a>. Dates are in ISO 8601 format.</p>
+
+  <!-- v0.1.0 -->
+  <div class="release">
+    <div class="release-meta">
+      <div class="release-version">v0.1.0</div>
+      <div class="release-date">2025 — Q2</div>
+      <span class="release-badge badge-latest">Latest · Beta</span>
+    </div>
+    <div class="release-body">
+      <h3>Initial Beta Release</h3>
+      <div class="change-group">
+        <div class="change-group-label added">✦ Added</div>
+        <ul class="change-list">
+          <li>Full bidirectional sync across all 7 data collections via outbox pattern</li>
+          <li>Photo capture on herd registration and activity log, thumbnails shown on herd cards</li>
+          <li>Sales history screen with full transaction list</li>
+          <li>Inventory management with inline edit support</li>
+          <li>Dashboard with live stats pulling from SQLite aggregates</li>
+          <li>Conflict detection and audit log — accessible via long-press on the sync banner</li>
+          <li>Offline-first architecture: all features function without connectivity</li>
+          <li>PIN auth layer on top of Appwrite sessions (<code>flutter_secure_storage</code>)</li>
+          <li>Milk logging sessions linked per animal</li>
+          <li>Partial payment support on financial records (instalment tracking)</li>
+          <li>1000s heartbeat sync via <code>AppRefreshService</code></li>
+          <li>Cursor-based down-sync with per-collection watermarks (<code>sync_meta</code>)</li>
+          <li><code>AppRefreshService</code> emits pre + post sync stream events for clean UI states</li>
+          <li>Image compression pipeline: pick → compress (JPEG ≤200KB) → cache → queue → upload</li>
+          <li><code>SessionManager</code> restores user session from secure storage on app start</li>
+        </ul>
+      </div>
+      <div class="change-group">
+        <div class="change-group-label known">⚠ Known Issues</div>
+        <ul class="change-list">
+          <li><code>setState() callback returned a Future</code> warning on <code>_InventoryScreenState._load</code> and related screens — non-fatal, cosmetic; async refactor pending</li>
+          <li>Partial payments via M-Pesa unsupported when no receipt exists — manual M-Pesa entry option planned</li>
+          <li><code>asset_images</code> Appwrite collection must be created manually in the Console before image sync works end-to-end</li>
+          <li>SQLite schema version 1 — no migration support; beta assumes fresh install</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- v0.0.3 -->
+  <div class="release">
+    <div class="release-meta">
+      <div class="release-version">v0.0.3</div>
+      <div class="release-date">2025 — Q1</div>
+      <span class="release-badge badge-beta">Alpha</span>
+    </div>
+    <div class="release-body">
+      <h3>Sync Engine Stabilisation</h3>
+      <div class="change-group">
+        <div class="change-group-label added">✦ Added</div>
+        <ul class="change-list">
+          <li>Transactional outbox queue (<code>sync_queue</code>) replacing direct Appwrite writes</li>
+          <li>Cursor-based down-sync replacing full-collection pulls</li>
+          <li><code>sync_conflicts</code> collection and in-app conflict viewer</li>
+          <li>Unlock-triggered immediate sync tick</li>
+        </ul>
+      </div>
+      <div class="change-group">
+        <div class="change-group-label fixed">✔ Fixed</div>
+        <ul class="change-list">
+          <li>Race condition between concurrent sync runs causing duplicate outbox processing</li>
+          <li>Down-sync overwriting locally-newer records without logging conflict</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- v0.0.2 -->
+  <div class="release">
+    <div class="release-meta">
+      <div class="release-version">v0.0.2</div>
+      <div class="release-date">2025 — Q1</div>
+      <span class="release-badge badge-alpha">Alpha</span>
+    </div>
+    <div class="release-body">
+      <h3>Core Data Layer</h3>
+      <div class="change-group">
+        <div class="change-group-label added">✦ Added</div>
+        <ul class="change-list">
+          <li>SQLite schema v1: all 9 collection tables + housekeeping tables</li>
+          <li>Appwrite SDK initialisation and auth flow</li>
+          <li>Assets, inventory, and financial screens (read-only)</li>
+          <li>Milk log creation and listing</li>
+          <li>PIN setup and local authentication</li>
+        </ul>
+      </div>
+      <div class="change-group">
+        <div class="change-group-label changed">↺ Changed</div>
+        <ul class="change-list">
+          <li>Moved Appwrite credentials to <code>AppConfig</code> class (out of inline constants)</li>
+          <li>Replaced direct Appwrite session checks with <code>SessionManager</code></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- v0.0.1 -->
+  <div class="release">
+    <div class="release-meta">
+      <div class="release-version">v0.0.1</div>
+      <div class="release-date">2025 — Q1</div>
+      <span class="release-badge badge-alpha">Alpha</span>
+    </div>
+    <div class="release-body">
+      <h3>Project Scaffold</h3>
+      <div class="change-group">
+        <div class="change-group-label added">✦ Added</div>
+        <ul class="change-list">
+          <li>Flutter project initialisation — Android target, TECNO KD7 test device</li>
+          <li>Appwrite Cloud project and database provisioned (Frankfurt region)</li>
+          <li>Initial pubspec with core dependencies</li>
+          <li>Basic navigation shell and placeholder screens</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+</div>
+</div>
+
+<script>
+  function showPage(id) {
+    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+    document.getElementById('page-' + id).classList.add('active');
+    // Desktop nav active state
+    document.querySelectorAll('.nav-links a').forEach(a => a.classList.remove('active'));
+    const el = document.getElementById('nav-' + id);
+    if (el) el.classList.add('active');
+    // Drawer active state
+    document.querySelectorAll('.nav-drawer a').forEach(a => a.classList.remove('active'));
+    const del = document.getElementById('drawer-' + id);
+    if (del) del.classList.add('active');
+    window.scrollTo(0, 0);
+    initFadeUps();
+    return false;
+  }
+
+  function scrollDoc(id) {
+    const el = document.getElementById(id);
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    return false;
+  }
+
+  function toggleDrawer() {
+    const drawer = document.getElementById('nav-drawer');
+    const btn = document.getElementById('hamburger');
+    const open = drawer.classList.toggle('open');
+    btn.classList.toggle('open', open);
+    document.body.style.overflow = open ? 'hidden' : '';
+  }
+
+  function closeDrawer() {
+    const drawer = document.getElementById('nav-drawer');
+    const btn = document.getElementById('hamburger');
+    drawer.classList.remove('open');
+    btn.classList.remove('open');
+    document.body.style.overflow = '';
+  }
+
+  // Close drawer on outside tap
+  document.addEventListener('click', function(e) {
+    const drawer = document.getElementById('nav-drawer');
+    const btn = document.getElementById('hamburger');
+    if (drawer.classList.contains('open') && !drawer.contains(e.target) && !btn.contains(e.target)) {
+      closeDrawer();
+    }
+  });
+
+  function initFadeUps() {
+    const obs = new IntersectionObserver((entries) => {
+      entries.forEach(e => { if (e.isIntersecting) e.target.classList.add('visible'); });
+    }, { threshold: 0.1 });
+    document.querySelectorAll('.fade-up').forEach(el => obs.observe(el));
+  }
+
+  document.addEventListener('DOMContentLoaded', initFadeUps);
+</script>
+</body>
+</html>
