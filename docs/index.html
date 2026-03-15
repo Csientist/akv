@@ -468,6 +468,42 @@
     line-height: 1.65;
   }
 
+  /* ─── POWERED BY GRID ─── */
+  .powered-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1px;
+    background: rgba(90,171,103,.12);
+    border: 1px solid rgba(90,171,103,.12);
+    border-radius: var(--radius);
+    overflow: hidden;
+  }
+  .powered-card {
+    background: var(--bark);
+    padding: 1.6rem 1.5rem;
+    transition: background .2s;
+  }
+  .powered-card:hover { background: #1f3522; }
+  .powered-icon {
+    font-size: 1.4rem;
+    color: var(--clay);
+    margin-bottom: .7rem;
+    line-height: 1;
+    font-style: normal;
+  }
+  .powered-name {
+    font-family: var(--font-display);
+    font-size: 1rem;
+    color: var(--straw);
+    margin-bottom: .4rem;
+  }
+  .powered-desc {
+    font-family: var(--font-body);
+    font-size: .82rem;
+    color: rgba(224,240,220,.5);
+    line-height: 1.55;
+  }
+
   /* ─── OVERVIEW HIGHLIGHTS ─── */
   .highlight-row {
     display: grid;
@@ -1258,6 +1294,7 @@
 
     /* Feature grid — 1 col */
     .feature-grid { grid-template-columns: 1fr; gap: 1px; }
+    .powered-grid { grid-template-columns: 1fr; }
 
     /* Highlight row */
     .highlight-row {
@@ -1522,18 +1559,24 @@
       <div class="feature-chip"><div class="dot"></div><span>Transactional outbox sync</span></div>
       <div class="feature-chip"><div class="dot" style="background:var(--harvest)"></div><span>Conflict detection</span></div>
       <div class="feature-chip"><div class="dot" style="background:var(--river)"></div><span>Photo capture + compression</span></div>
-      <div class="feature-chip"><div class="dot"></div><span>M-Pesa ready</span></div>
+      <div class="feature-chip"><div class="dot"></div><span>M-Pesa STK push</span></div>
       <div class="feature-chip"><div class="dot" style="background:var(--harvest)"></div><span>PIN auth layer</span></div>
       <div class="feature-chip"><div class="dot" style="background:var(--river)"></div><span>Bidirectional sync</span></div>
+      <div class="feature-chip"><div class="dot"></div><span>Appwrite Functions · Go</span></div>
+      <div class="feature-chip"><div class="dot" style="background:var(--harvest)"></div><span>Cloudflare Workers</span></div>
+      <div class="feature-chip"><div class="dot" style="background:var(--river)"></div><span>Appwrite Sites</span></div>
       <div class="feature-chip"><div class="dot"></div><span>Android-first</span></div>
       <!-- duplicate for seamless loop -->
       <div class="feature-chip"><div class="dot"></div><span>Offline-first SQLite</span></div>
       <div class="feature-chip"><div class="dot"></div><span>Transactional outbox sync</span></div>
       <div class="feature-chip"><div class="dot" style="background:var(--harvest)"></div><span>Conflict detection</span></div>
       <div class="feature-chip"><div class="dot" style="background:var(--river)"></div><span>Photo capture + compression</span></div>
-      <div class="feature-chip"><div class="dot"></div><span>M-Pesa ready</span></div>
+      <div class="feature-chip"><div class="dot"></div><span>M-Pesa STK push</span></div>
       <div class="feature-chip"><div class="dot" style="background:var(--harvest)"></div><span>PIN auth layer</span></div>
       <div class="feature-chip"><div class="dot" style="background:var(--river)"></div><span>Bidirectional sync</span></div>
+      <div class="feature-chip"><div class="dot"></div><span>Appwrite Functions · Go</span></div>
+      <div class="feature-chip"><div class="dot" style="background:var(--harvest)"></div><span>Cloudflare Workers</span></div>
+      <div class="feature-chip"><div class="dot" style="background:var(--river)"></div><span>Appwrite Sites</span></div>
       <div class="feature-chip"><div class="dot"></div><span>Android-first</span></div>
     </div>
   </div>
@@ -1573,6 +1616,44 @@
         <div class="feature-icon">🔒</div>
         <h3>Secure &amp; Private</h3>
         <p>PIN auth layer on top of Appwrite sessions. Credentials stored via <code>flutter_secure_storage</code>. Each user scoped by <code>created_by</code>.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- POWERED BY -->
+  <section style="background:var(--soil);padding:3.5rem 5rem;">
+    <div class="section-label" style="color:rgba(224,240,220,.4);">Built with</div>
+    <h2 style="font-family:var(--font-display);font-size:1.6rem;color:var(--straw);margin-bottom:2rem;">The stack behind the app</h2>
+    <div class="powered-grid">
+      <div class="powered-card">
+        <div class="powered-icon">▲</div>
+        <div class="powered-name">Flutter</div>
+        <div class="powered-desc">Cross-platform UI, Android-first build targeting API 23+</div>
+      </div>
+      <div class="powered-card">
+        <div class="powered-icon" style="color:#f02e65;">✦</div>
+        <div class="powered-name">Appwrite Cloud</div>
+        <div class="powered-desc">Database, Auth, Storage, Functions, and Sites — all in one project</div>
+      </div>
+      <div class="powered-card">
+        <div class="powered-icon" style="color:#c8a84a;">⬡</div>
+        <div class="powered-name">Go (Appwrite Functions)</div>
+        <div class="powered-desc">STK push and Daraja callback handlers running serverless on Appwrite</div>
+      </div>
+      <div class="powered-card">
+        <div class="powered-icon" style="color:#f6821f;">◈</div>
+        <div class="powered-name">Cloudflare Workers</div>
+        <div class="powered-desc">Edge proxy normalising headers between Appwrite Functions and Safaricom Daraja</div>
+      </div>
+      <div class="powered-card">
+        <div class="powered-icon" style="color:#00b140;">M</div>
+        <div class="powered-name">M-Pesa / Daraja</div>
+        <div class="powered-desc">STK push payments and callback settlement for Kenyan mobile money</div>
+      </div>
+      <div class="powered-card">
+        <div class="powered-icon" style="color:#6dbf74;">◉</div>
+        <div class="powered-name">SQLite (sqflite)</div>
+        <div class="powered-desc">Local-first truth store — all writes are instant, sync is secondary</div>
       </div>
     </div>
   </section>
@@ -1685,7 +1766,7 @@ Endpoint   : https://YOUR_APPWRITE_ENDPOINT/v1</code></pre>
         <tr><td>partial_payments</td><td>payment_id</td><td>Instalments on a financial record</td></tr>
         <tr><td>asset_events</td><td>event_id</td><td>Activity log per asset</td></tr>
         <tr><td>milk_logs</td><td>log_id</td><td>Milk sessions</td></tr>
-        <tr><td>asset_images</td><td>image_id</td><td>This stores reference + thumbnail URL</td></tr>
+        <tr><td>asset_images</td><td>image_id</td><td>Image metadata — stores file reference and thumbnail URL</td></tr>
         <tr><td>sync_conflicts</td><td>conflict_id</td><td>Conflict audit log</td></tr>
       </tbody>
     </table></div>
@@ -1775,7 +1856,7 @@ flutter build appbundle --release</code></pre>
 <div class="arch-page">
   <div class="section-label">Technical Reference</div>
   <h1>Architecture</h1>
-  <p class="lead">Akavango is built on a local-first principle: the SQLite database is the single source of truth on-device, and Appwrite Cloud is the sync target — never the primary data store. This section covers the full service graph, data flow, and schema.</p>
+  <p class="lead">Akavango is built on a local-first principle: SQLite is the source of truth on-device, and Appwrite Cloud is the sync target. The payment layer is powered by Appwrite Functions in Go talking to Safaricom's Daraja API via a Cloudflare Worker. This very documentation is hosted on Appwrite Sites.</p>
 
   <h2>Service Architecture</h2>
   <div class="arch-grid">
@@ -1931,13 +2012,85 @@ DownSyncService.pull()
     <strong>Appwrite wins.</strong> When a down-sync document has a newer <code>updated_at</code> than the local SQLite row, the Appwrite version overwrites the local record. The overwritten local values are recorded in <code>sync_conflicts</code> with a <code>conflict_id</code> for full audit. Users can review conflicts via the long-press menu on the sync banner.
   </div>
 
+  <h2 id="arch-infra">Cloud Infrastructure</h2>
+  <p style="color:#2e4a32;font-size:.97rem;margin-bottom:2rem;">Akavango's server-side is built entirely on Appwrite — Functions for backend logic, Sites for this documentation, and Appwrite Database as the sync target. M-Pesa integration is handled via a Cloudflare Worker that bridges Safaricom's Daraja API with the app's payment flow.</p>
+
+  <div class="arch-grid" style="margin-bottom:2.5rem">
+    <div class="arch-card">
+      <div class="arch-card-header"><span class="icon">📱</span><h3>M-Pesa STK Push — Appwrite Function</h3></div>
+      <div class="arch-card-body">
+        <p>An Appwrite Function written in <strong>Go</strong> initiates the STK push to Safaricom's Daraja API. When a user triggers a payment in the app, the function requests the push prompt on the user's phone.</p>
+        <ul>
+          <li>Runtime: Go on Appwrite Functions</li>
+          <li>Triggered by app via Appwrite SDK function execution</li>
+          <li>Calls Daraja <code>/mpesa/stkpush/v1/processrequest</code></li>
+          <li>Returns <code>CheckoutRequestID</code> for callback matching</li>
+        </ul>
+      </div>
+    </div>
+    <div class="arch-card">
+      <div class="arch-card-header"><span class="icon">🔁</span><h3>M-Pesa Callback — Appwrite Function</h3></div>
+      <div class="arch-card-body">
+        <p>A second Go function receives the payment result callback from Safaricom. It validates the payload, updates the relevant <code>financials</code> and <code>partial_payments</code> records in Appwrite Database, and marks the transaction as settled.</p>
+        <ul>
+          <li>Exposed as an Appwrite Function HTTP endpoint</li>
+          <li>Receives and validates Daraja callback body</li>
+          <li>Writes confirmed payment to <code>financials</code> collection</li>
+          <li>Creates row in <code>partial_payments</code> if instalment</li>
+        </ul>
+      </div>
+    </div>
+    <div class="arch-card">
+      <div class="arch-card-header"><span class="icon">☁️</span><h3>Cloudflare Worker — Daraja Proxy</h3></div>
+      <div class="arch-card-body">
+        <p>Safaricom's Daraja API requires specific headers and has CORS restrictions that conflict with direct requests from Appwrite Functions. A Cloudflare Worker sits between the two, normalising headers and routing requests transparently.</p>
+        <ul>
+          <li>Proxies requests from the Go functions to Daraja</li>
+          <li>Handles CORS and header compatibility</li>
+          <li>Adds OAuth token injection for Daraja auth</li>
+          <li>Zero cold-start latency on Cloudflare's edge network</li>
+        </ul>
+      </div>
+    </div>
+    <div class="arch-card">
+      <div class="arch-card-header"><span class="icon">🌐</span><h3>Appwrite Sites — This Documentation</h3></div>
+      <div class="arch-card-body">
+        <p>This documentation site is deployed and hosted on Appwrite Sites — part of the same Appwrite project as the app's backend. No separate hosting provider needed.</p>
+        <ul>
+          <li>Static HTML deployed to Appwrite Sites</li>
+          <li>Served from the same Appwrite project</li>
+          <li>Connected to the same repo — changelog stays in sync with the codebase</li>
+          <li>Zero external hosting dependencies</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <h3>M-Pesa Payment Flow</h3>
+  <pre><code>User confirms payment in app
+    │
+    ▼
+Appwrite Function (Go) — STK Push
+    │
+    ▼
+Cloudflare Worker (header/CORS proxy)
+    │
+    ▼
+Safaricom Daraja API → STK prompt on user's phone
+    │
+    ▼  [user enters PIN on phone]
+Daraja Callback → Cloudflare Worker → Appwrite Function (Go)
+    │
+    ├─► Appwrite Database: update financials
+    └─► Appwrite Database: insert partial_payment (if instalment)</code></pre>
+
   <h2>Deferred &amp; Roadmap Items</h2>
   <div class="table-scroll"><table class="collection-table">
     <thead><tr><th>Item</th><th>Status</th><th>Notes</th></tr></thead>
     <tbody>
       <tr><td>setState Future warning</td><td><span style="color:var(--harvest);font-family:var(--font-mono);font-size:.8rem">COSMETIC</span></td><td>Async refactor needed across all screen loaders</td></tr>
       <tr><td>M-Pesa manual entry</td><td><span style="color:var(--terracotta);font-family:var(--font-mono);font-size:.8rem">PLANNED</span></td><td>No-receipt M-Pesa payments not yet supported</td></tr>
-      <tr><td>SQLite migrations</td><td><span style="color:var(--harvest);font-family:var(--font-mono);font-size:.8rem">BETA ONLY</span></td><td>Schema v1 only — beta, fresh-install assumption</td></tr>
+      <tr><td>SQLite migrations</td><td><span style="color:var(--harvest);font-family:var(--font-mono);font-size:.8rem">BETA ONLY</span></td><td>Schema v1 — beta assumes fresh install; migrations come post-beta</td></tr>
     </tbody>
   </table></div>
 </div>
