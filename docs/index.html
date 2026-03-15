@@ -68,11 +68,22 @@
   }
   .nav-brand span.accent { color: var(--clay); }
   .nav-brand .logo-mark {
-    width: 30px; height: 30px;
+    width: 32px; height: 32px;
+    flex-shrink: 0;
+    border-radius: 6px;
+    overflow: hidden;
+    display: flex; align-items: center; justify-content: center;
+    background: var(--terracotta);
+  }
+  .nav-brand .logo-mark img {
+    width: 100%; height: 100%;
+    object-fit: contain;
+  }
+  /* Fallback leaf shape when no logo */
+  .nav-brand .logo-mark.no-logo {
     background: var(--terracotta);
     border-radius: 50% 50% 50% 0;
     transform: rotate(-45deg);
-    flex-shrink: 0;
   }
   .nav-links {
     display: flex; gap: 2rem; list-style: none;
@@ -183,26 +194,140 @@
   }
   .btn-ghost:hover { border-color: var(--clay); color: var(--clay); }
 
-  .hero-stats {
-    margin-top: 4rem;
-    display: flex; gap: 2.5rem;
-    border-top: 1px solid rgba(245,230,200,.12);
-    padding-top: 2rem;
+  /* ─── SCREEN SHOWCASE ─── */
+  .screen-showcase {
+    position: relative;
+    width: 360px; height: 480px;
+    display: flex; align-items: center; justify-content: center;
   }
-  .stat-num {
-    font-family: var(--font-display);
-    font-size: 2rem;
-    color: #c8e6b0;
+  .mock-phone {
+    position: absolute;
+    transition: transform .4s ease;
+  }
+  .mock-center {
+    z-index: 3;
+    transform: translateY(0) scale(1);
+  }
+  .mock-back-left {
+    z-index: 2;
+    transform: translateX(-130px) translateY(20px) scale(0.82) rotate(-6deg);
+    opacity: .7;
+  }
+  .mock-back-right {
+    z-index: 2;
+    transform: translateX(130px) translateY(20px) scale(0.82) rotate(6deg);
+    opacity: .7;
+  }
+  .mock-shell {
+    width: 160px;
+    background: #1c2e1f;
+    border: 1.5px solid #3a7d44;
+    border-radius: 22px;
+    padding: 8px;
+    box-shadow: 0 20px 60px rgba(0,0,0,.5), 0 0 0 1px rgba(90,171,103,.1);
+    position: relative;
+  }
+  .mock-center .mock-shell { width: 185px; }
+  .mock-notch {
+    width: 50px; height: 8px;
+    background: #111a13;
+    border-radius: 0 0 8px 8px;
+    margin: 0 auto 6px;
+  }
+  .mock-center .mock-notch { width: 60px; }
+  .mock-screen {
+    background: #111a13;
+    border-radius: 14px;
+    overflow: hidden;
+    min-height: 260px;
+    position: relative;
+  }
+  .mock-center .mock-screen { min-height: 300px; }
+  .mock-statusbar {
+    display: flex; justify-content: space-between;
+    padding: 4px 10px 2px;
+  }
+  .mock-topbar {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 6px 10px 8px;
+    background: #1c2e1f;
+    border-bottom: 1px solid rgba(58,125,68,.3);
+  }
+  .mock-sync-dot {
+    display: flex; align-items: center; gap: 4px;
+    font-family: 'DM Mono', monospace;
+    font-size: 7px;
+    color: #6dbf74;
+  }
+  .mock-sync-dot span {
+    width: 5px; height: 5px;
+    border-radius: 50%;
+    background: #6dbf74;
+    animation: pulse 2s infinite;
+  }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: .3; }
+  }
+  .mock-stats-row {
+    display: flex; gap: 4px;
+    padding: 8px 8px 6px;
+  }
+  .mock-stat-card {
+    flex: 1;
+    background: #1c2e1f;
+    border-radius: 4px;
+    padding: 6px 4px;
+    text-align: center;
+    border: 1px solid #2e5e35;
+  }
+  .mock-stat-num {
+    font-family: 'Playfair Display', serif;
+    font-size: 12px;
+    color: #6dbf74;
     line-height: 1;
   }
-  .stat-label {
-    font-family: var(--font-mono);
-    font-size: .7rem;
-    letter-spacing: .1em;
+  .mock-stat-label {
+    font-family: 'DM Mono', monospace;
+    font-size: 6px;
+    color: rgba(224,240,220,.4);
+    margin-top: 2px;
     text-transform: uppercase;
-    color: rgba(245,230,200,.5);
-    margin-top: .3rem;
+    letter-spacing: .05em;
   }
+  .mock-bottomnav {
+    display: flex;
+    background: #1c2e1f;
+    border-top: 1px solid rgba(58,125,68,.3);
+    padding: 6px 0;
+    margin-top: 8px;
+  }
+  .mock-nav-item {
+    flex: 1; text-align: center;
+    font-size: 12px;
+    opacity: .4;
+    cursor: default;
+  }
+  .mock-nav-item.active { opacity: 1; }
+  .mock-line {
+    height: 6px;
+    background: rgba(224,240,220,.15);
+    border-radius: 3px;
+  }
+  .mock-line.short { height: 5px; }
+  .mock-dot {
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    margin-top: 2px;
+  }
+  .mock-item-row, .mock-finance-row {
+    display: flex; align-items: flex-start; gap: 6px;
+    padding: 5px 0;
+    border-bottom: 1px solid rgba(58,125,68,.15);
+  }
+  .mock-finance-row { align-items: center; }
+  .mock-row { padding: 0; }
 
   .hero-right {
     position: relative;
@@ -816,8 +941,7 @@
     .hero-right { display: none; }
     .hero-left {
       padding: 3.5rem 1.4rem 3rem;
-    }
-    .hero-title { font-size: 2.2rem; }
+    }    .hero-title { font-size: 2.2rem; }
     .hero-desc { font-size: .97rem; }
     .hero-ctas { flex-direction: column; gap: .75rem; }
     .btn-primary, .btn-ghost { justify-content: center; text-align: center; }
@@ -912,7 +1036,10 @@
 <!-- ══════════════════════════ NAV ══════════════════════════ -->
 <nav>
   <a href="#" class="nav-brand" onclick="showPage('home')">
-    <div class="logo-mark"></div>
+    <!-- LOGO: Replace src with your actual logo path, e.g. src="assets/logo.png" -->
+    <div class="logo-mark" id="nav-logo-mark">
+      <img src="assets/logo.png" alt="Akavango Logo" onerror="this.parentElement.classList.add('no-logo');this.style.display='none'">
+    </div>
     Akavango <span class="accent">Farm</span>
   </a>
   <ul class="nav-links">
@@ -949,59 +1076,148 @@
         <a href="#" class="btn-primary" onclick="showPage('start')">↓ Get Started</a>
         <a href="#" class="btn-ghost" onclick="showPage('arch')">Architecture →</a>
       </div>
-      <div class="hero-stats">
-        <div class="stat-item">
-          <div class="stat-num">9</div>
-          <div class="stat-label">Sync Collections</div>
-        </div>
-        <div class="stat-item">
-          <div class="stat-num">100%</div>
-          <div class="stat-label">Offline-First</div>
-        </div>
-        <div class="stat-item">
-          <div class="stat-num">SQLite</div>
-          <div class="stat-label">Local Truth</div>
-        </div>
-      </div>
     </div>
     <div class="hero-right">
       <div class="hero-visual">
-        <svg class="arch-diagram" viewBox="0 0 380 420" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <!-- Phone silhouette -->
-          <rect x="110" y="20" width="160" height="280" rx="18" fill="#1c2e1f" stroke="#3a7d44" stroke-width="1.5"/>
-          <rect x="120" y="35" width="140" height="250" rx="10" fill="#111a13"/>
-          <!-- Screen content -->
-          <rect x="130" y="48" width="80" height="10" rx="3" fill="#3a7d44" opacity=".8"/>
-          <rect x="218" y="48" width="32" height="10" rx="3" fill="#2e5e35" opacity=".6"/>
-          <rect x="130" y="68" width="120" height="42" rx="4" fill="#1c2e1f" stroke="#3a7d44" stroke-width=".8"/>
-          <text x="138" y="84" font-family="DM Mono,monospace" font-size="8" fill="#5aab67">HERD SUMMARY</text>
-          <text x="138" y="97" font-family="DM Mono,monospace" font-size="7" fill="rgba(224,240,220,.5)">24 head · 3 calves</text>
-          <rect x="130" y="118" width="56" height="40" rx="3" fill="#1c2e1f" stroke="#2e5e35" stroke-width=".8"/>
-          <text x="138" y="133" font-family="DM Mono,monospace" font-size="7" fill="#6dbf74">MILK LOG</text>
-          <text x="138" y="147" font-family="DM Mono,monospace" font-size="9" fill="#c8e6b0">142 L</text>
-          <rect x="194" y="118" width="56" height="40" rx="3" fill="#1c2e1f" stroke="#4a8c6f" stroke-width=".8"/>
-          <text x="202" y="133" font-family="DM Mono,monospace" font-size="7" fill="#4a8c6f">FINANCE</text>
-          <text x="202" y="147" font-family="DM Mono,monospace" font-size="9" fill="#c8e6b0">+4,200</text>
-          <!-- Sync indicator -->
-          <circle cx="250" cy="195" r="5" fill="#6dbf74" opacity=".9">
-            <animate attributeName="opacity" values="0.9;0.3;0.9" dur="2s" repeatCount="indefinite"/>
-          </circle>
-          <text x="235" y="212" font-family="DM Mono,monospace" font-size="7" fill="rgba(224,240,220,.4)">SYNCED</text>
-          <!-- Bottom indicator -->
-          <rect x="165" y="290" width="50" height="4" rx="2" fill="#3a7d44" opacity=".6"/>
-          <!-- Appwrite cloud below -->
-          <rect x="80" y="330" width="220" height="60" rx="6" fill="#1c2e1f" stroke="#3a7d44" stroke-width="1"/>
-          <text x="122" y="355" font-family="DM Mono,monospace" font-size="9" fill="#5aab67">APPWRITE CLOUD</text>
-          <text x="108" y="373" font-family="DM Mono,monospace" font-size="7" fill="rgba(224,240,220,.4)">fra.cloud.appwrite.io · v1.8.1</text>
-          <!-- Sync arrows -->
-          <path d="M190 300 L190 328" stroke="#3a7d44" stroke-width="1" stroke-dasharray="4 3" marker-end="url(#arr)"/>
-          <defs>
-            <marker id="arr" markerWidth="6" markerHeight="6" refX="3" refY="3" orient="auto">
-              <path d="M0,0 L6,3 L0,6 Z" fill="#3a7d44"/>
-            </marker>
-          </defs>
-          <animateTransform attributeName="transform" attributeType="XML" type="translate" values="0,0;0,-4;0,0" dur="3s" repeatCount="indefinite" additive="sum"/>
-        </svg>
+        <!-- ── SCREEN MOCKUP SHOWCASE ── -->
+        <div class="screen-showcase">
+          <!-- Screen 1: Dashboard -->
+          <div class="mock-phone mock-back-left">
+            <div class="mock-shell">
+              <div class="mock-notch"></div>
+              <div class="mock-screen">
+                <div class="mock-statusbar">
+                  <span style="font-size:7px;color:rgba(224,240,220,.5);font-family:DM Mono,monospace">9:41</span>
+                  <span style="font-size:7px;color:rgba(224,240,220,.5);font-family:DM Mono,monospace">●●●</span>
+                </div>
+                <div class="mock-topbar" style="background:#1c2e1f;padding:8px 10px;">
+                  <div style="font-family:DM Mono,monospace;font-size:8px;color:#5aab67;letter-spacing:.08em">INVENTORY</div>
+                </div>
+                <div style="padding:8px 10px;">
+                  <div class="mock-row" style="margin-bottom:6px">
+                    <div class="mock-item-row"><div class="mock-dot" style="background:#6dbf74"></div><div style="flex:1"><div class="mock-line" style="width:70%"></div><div class="mock-line short" style="width:40%;margin-top:3px;opacity:.5"></div></div><div style="font-family:DM Mono,monospace;font-size:7px;color:#c8a84a">12 kg</div></div>
+                  </div>
+                  <div class="mock-row" style="margin-bottom:6px">
+                    <div class="mock-item-row"><div class="mock-dot" style="background:#c8a84a"></div><div style="flex:1"><div class="mock-line" style="width:55%"></div><div class="mock-line short" style="width:35%;margin-top:3px;opacity:.5"></div></div><div style="font-family:DM Mono,monospace;font-size:7px;color:#c8a84a">3 bags</div></div>
+                  </div>
+                  <div class="mock-row">
+                    <div class="mock-item-row"><div class="mock-dot" style="background:#4a8c6f"></div><div style="flex:1"><div class="mock-line" style="width:65%"></div><div class="mock-line short" style="width:30%;margin-top:3px;opacity:.5"></div></div><div style="font-family:DM Mono,monospace;font-size:7px;color:#c8a84a">6 units</div></div>
+                  </div>
+                </div>
+                <div style="padding:0 10px;margin-top:4px">
+                  <div style="background:#1c2e1f;border-radius:3px;padding:6px 8px;border:1px solid #2e5e35">
+                    <div style="font-family:DM Mono,monospace;font-size:7px;color:#5aab67;margin-bottom:4px">RECENT ACTIVITY</div>
+                    <div class="mock-line" style="width:90%;margin-bottom:3px"></div>
+                    <div class="mock-line" style="width:75%;margin-bottom:3px"></div>
+                    <div class="mock-line" style="width:60%"></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Screen 2: Dashboard (center, largest) -->
+          <div class="mock-phone mock-center">
+            <div class="mock-shell">
+              <div class="mock-notch"></div>
+              <div class="mock-screen">
+                <div class="mock-statusbar">
+                  <span style="font-size:7px;color:rgba(224,240,220,.5);font-family:DM Mono,monospace">9:41</span>
+                  <span style="font-size:7px;color:rgba(224,240,220,.5);font-family:DM Mono,monospace">●●●</span>
+                </div>
+                <div class="mock-topbar">
+                  <div style="font-family:'Playfair Display',serif;font-size:11px;color:#e0f0dc">Akavango</div>
+                  <div class="mock-sync-dot"><span></span>Synced</div>
+                </div>
+                <!-- Stats row -->
+                <div class="mock-stats-row">
+                  <div class="mock-stat-card">
+                    <div class="mock-stat-num">24</div>
+                    <div class="mock-stat-label">Herd</div>
+                  </div>
+                  <div class="mock-stat-card">
+                    <div class="mock-stat-num">142L</div>
+                    <div class="mock-stat-label">Milk</div>
+                  </div>
+                  <div class="mock-stat-card">
+                    <div class="mock-stat-num" style="color:#c8a84a">4.2k</div>
+                    <div class="mock-stat-label">Sales</div>
+                  </div>
+                </div>
+                <!-- Herd card -->
+                <div style="padding:0 8px;margin-bottom:6px">
+                  <div style="background:#1c2e1f;border-radius:4px;padding:8px;border:1px solid #2e5e35;display:flex;gap:8px;align-items:center">
+                    <div style="width:32px;height:32px;border-radius:3px;background:#2e5e35;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:14px">🐄</div>
+                    <div>
+                      <div class="mock-line" style="width:80px;margin-bottom:3px"></div>
+                      <div class="mock-line short" style="width:50px;opacity:.5"></div>
+                    </div>
+                  </div>
+                </div>
+                <!-- Milk chart bars -->
+                <div style="padding:0 8px">
+                  <div style="background:#1c2e1f;border-radius:4px;padding:8px;border:1px solid #2e5e35">
+                    <div style="font-family:DM Mono,monospace;font-size:7px;color:#5aab67;margin-bottom:6px">MILK LOG — THIS WEEK</div>
+                    <div style="display:flex;align-items:flex-end;gap:4px;height:28px">
+                      <div style="flex:1;background:#3a7d44;border-radius:2px 2px 0 0;height:60%"></div>
+                      <div style="flex:1;background:#3a7d44;border-radius:2px 2px 0 0;height:80%"></div>
+                      <div style="flex:1;background:#5aab67;border-radius:2px 2px 0 0;height:100%"></div>
+                      <div style="flex:1;background:#3a7d44;border-radius:2px 2px 0 0;height:70%"></div>
+                      <div style="flex:1;background:#3a7d44;border-radius:2px 2px 0 0;height:55%"></div>
+                      <div style="flex:1;background:#3a7d44;border-radius:2px 2px 0 0;height:90%"></div>
+                      <div style="flex:1;background:#2e5e35;border-radius:2px 2px 0 0;height:40%;opacity:.5"></div>
+                    </div>
+                  </div>
+                </div>
+                <!-- Bottom nav -->
+                <div class="mock-bottomnav">
+                  <div class="mock-nav-item active">🏠</div>
+                  <div class="mock-nav-item">🐄</div>
+                  <div class="mock-nav-item">📦</div>
+                  <div class="mock-nav-item">💰</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Screen 3: Financials -->
+          <div class="mock-phone mock-back-right">
+            <div class="mock-shell">
+              <div class="mock-notch"></div>
+              <div class="mock-screen">
+                <div class="mock-statusbar">
+                  <span style="font-size:7px;color:rgba(224,240,220,.5);font-family:DM Mono,monospace">9:41</span>
+                  <span style="font-size:7px;color:rgba(224,240,220,.5);font-family:DM Mono,monospace">●●●</span>
+                </div>
+                <div class="mock-topbar" style="background:#1c2e1f;padding:8px 10px;">
+                  <div style="font-family:DM Mono,monospace;font-size:8px;color:#5aab67;letter-spacing:.08em">FINANCIALS</div>
+                </div>
+                <div style="padding:8px 10px">
+                  <div style="font-family:DM Mono,monospace;font-size:7px;color:rgba(224,240,220,.4);margin-bottom:4px">RECENT TRANSACTIONS</div>
+                  <div class="mock-finance-row">
+                    <div class="mock-dot" style="background:#6dbf74"></div>
+                    <div style="flex:1"><div class="mock-line" style="width:65%"></div></div>
+                    <div style="font-family:DM Mono,monospace;font-size:7px;color:#6dbf74">+2,400</div>
+                  </div>
+                  <div class="mock-finance-row">
+                    <div class="mock-dot" style="background:#6dbf74"></div>
+                    <div style="flex:1"><div class="mock-line" style="width:55%"></div></div>
+                    <div style="font-family:DM Mono,monospace;font-size:7px;color:#6dbf74">+1,800</div>
+                  </div>
+                  <div class="mock-finance-row">
+                    <div class="mock-dot" style="background:#e05a4a"></div>
+                    <div style="flex:1"><div class="mock-line" style="width:70%"></div></div>
+                    <div style="font-family:DM Mono,monospace;font-size:7px;color:#e05a4a">−320</div>
+                  </div>
+                  <div style="margin-top:8px;background:#1c2e1f;border-radius:3px;padding:6px 8px;border:1px solid #2e5e35">
+                    <div style="font-family:DM Mono,monospace;font-size:7px;color:rgba(224,240,220,.4)">NET BALANCE</div>
+                    <div style="font-family:'Playfair Display',serif;font-size:14px;color:#c8a84a;margin-top:2px">KES 3,880</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -1055,46 +1271,6 @@
     </div>
   </section>
 
-  <!-- HOW SYNC WORKS -->
-  <div class="highlight-row">
-    <div class="highlight-img" style="background: var(--soil);">
-      <svg viewBox="0 0 300 200" width="280" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <!-- Outbox flow diagram -->
-        <rect x="10" y="75" width="80" height="50" rx="4" fill="#1c2e1f" stroke="#3a7d44" stroke-width="1.2"/>
-        <text x="22" y="97" font-family="DM Mono,monospace" font-size="8" fill="#5aab67">WRITE</text>
-        <text x="22" y="111" font-family="DM Mono,monospace" font-size="7" fill="rgba(224,240,220,.4)">SQLite</text>
-        <path d="M92 100 L118 100" stroke="#3a7d44" stroke-width="1.2" marker-end="url(#a2)"/>
-        <rect x="120" y="75" width="80" height="50" rx="4" fill="#1c2e1f" stroke="#c8a84a" stroke-width="1.2"/>
-        <text x="130" y="97" font-family="DM Mono,monospace" font-size="8" fill="#c8a84a">QUEUE</text>
-        <text x="130" y="111" font-family="DM Mono,monospace" font-size="7" fill="rgba(224,240,220,.4)">sync_queue</text>
-        <path d="M202 100 L228 100" stroke="#c8a84a" stroke-width="1.2" marker-end="url(#a3)"/>
-        <rect x="230" y="75" width="60" height="50" rx="4" fill="#1c2e1f" stroke="#6dbf74" stroke-width="1.2"/>
-        <text x="240" y="97" font-family="DM Mono,monospace" font-size="8" fill="#6dbf74">PUSH</text>
-        <text x="240" y="111" font-family="DM Mono,monospace" font-size="7" fill="rgba(224,240,220,.4)">Appwrite</text>
-        <!-- Down arrow -->
-        <path d="M260 155 L260 128" stroke="#4a8c6f" stroke-width="1" stroke-dasharray="4 3" marker-end="url(#a4)"/>
-        <text x="210" y="172" font-family="DM Mono,monospace" font-size="7" fill="#4a8c6f">DOWN-SYNC (cursor-based)</text>
-        <defs>
-          <marker id="a2" markerWidth="6" markerHeight="6" refX="3" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="#3a7d44"/></marker>
-          <marker id="a3" markerWidth="6" markerHeight="6" refX="3" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="#c8a84a"/></marker>
-          <marker id="a4" markerWidth="6" markerHeight="6" refX="3" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="#4a8c6f"/></marker>
-        </defs>
-      </svg>
-    </div>
-    <div class="highlight-text">
-      <div class="section-label">Sync Architecture</div>
-      <h2>Write local, sync smart</h2>
-      <p>Every write hits SQLite immediately — the app never waits for a network round-trip. A <code>sync_queue</code> outbox table records each pending operation. <code>SyncService</code> drains the queue when connectivity is available.</p>
-      <p>Down-sync uses cursor-based pagination to pull all nine collections from Appwrite after every up-sync pass. Conflicts are resolved with "Appwrite wins" and logged to <code>sync_conflicts</code> for audit.</p>
-      <div class="tag-list">
-        <span class="tag">Outbox Pattern</span>
-        <span class="tag">Cursor Pagination</span>
-        <span class="tag">Conflict Audit</span>
-        <span class="tag">1000s Heartbeat</span>
-      </div>
-    </div>
-  </div>
-
   <footer>
     <div class="footer-brand">Akavango <span>Farm</span> Manager</div>
     <div class="footer-links">
@@ -1102,7 +1278,7 @@
       <a href="#" onclick="showPage('changelog')">Changelog</a>
       <a href="#" onclick="showPage('arch')">Architecture</a>
     </div>
-    <div class="footer-meta">Beta v0.1.0 · Appwrite 1.8.1 · Flutter SDK</div>
+    <div class="footer-meta">Beta v0.1.0 · Flutter · Appwrite Cloud</div>
   </footer>
 </div>
 
@@ -1112,29 +1288,29 @@
   <aside class="docs-sidebar">
     <div class="sidebar-group">
       <div class="sidebar-group-label">Introduction</div>
-      <a href="#" class="sidebar-link active" onclick="scrollDoc('gs-intro')">Overview</a>
-      <a href="#" class="sidebar-link" onclick="scrollDoc('gs-prereq')">Prerequisites</a>
+      <a href="#" class="sidebar-link active" onclick="scrollDoc('gs-intro',this)">Overview</a>
+      <a href="#" class="sidebar-link" onclick="scrollDoc('gs-prereq',this)">Prerequisites</a>
     </div>
     <div class="sidebar-group">
       <div class="sidebar-group-label">Installation</div>
-      <a href="#" class="sidebar-link" onclick="scrollDoc('gs-flutter')">Flutter Setup</a>
-      <a href="#" class="sidebar-link" onclick="scrollDoc('gs-appwrite')">Appwrite Console</a>
-      <a href="#" class="sidebar-link" onclick="scrollDoc('gs-env')">Environment Config</a>
+      <a href="#" class="sidebar-link" onclick="scrollDoc('gs-flutter',this)">Flutter Setup</a>
+      <a href="#" class="sidebar-link" onclick="scrollDoc('gs-appwrite',this)">Appwrite Console</a>
+      <a href="#" class="sidebar-link" onclick="scrollDoc('gs-env',this)">Environment Config</a>
     </div>
     <div class="sidebar-group">
       <div class="sidebar-group-label">Run & Build</div>
-      <a href="#" class="sidebar-link" onclick="scrollDoc('gs-run')">First Run</a>
-      <a href="#" class="sidebar-link" onclick="scrollDoc('gs-build')">Release Build</a>
+      <a href="#" class="sidebar-link" onclick="scrollDoc('gs-run',this)">First Run</a>
+      <a href="#" class="sidebar-link" onclick="scrollDoc('gs-build',this)">Release Build</a>
     </div>
     <div class="sidebar-group">
       <div class="sidebar-group-label">Reference</div>
-      <a href="#" class="sidebar-link" onclick="scrollDoc('gs-envvars')">All Config Values</a>
-      <a href="#" class="sidebar-link" onclick="scrollDoc('gs-known')">Known Issues</a>
+      <a href="#" class="sidebar-link" onclick="scrollDoc('gs-envvars',this)">All Config Values</a>
+      <a href="#" class="sidebar-link" onclick="scrollDoc('gs-known',this)">Known Issues</a>
     </div>
   </aside>
   <main class="docs-content">
     <h1 id="gs-intro">Getting Started</h1>
-    <p class="lead">Get Akavango Farm Manager running on your Android device. The app targets Android-first (tested on TECNO KD7) with iOS-ready architecture. Appwrite Cloud (Frankfurt region) handles the backend — you'll need a free Appwrite account.</p>
+    <p class="lead">Get Akavango Farm Manager running on your Android device. The app targets Android-first (tested on your Android device) with iOS-ready architecture. Appwrite Cloud (Frankfurt region) handles the backend — you'll need a free Appwrite account.</p>
 
     <h2 id="gs-prereq">Prerequisites</h2>
     <ul>
@@ -1187,9 +1363,9 @@ cd akavango-farm</code></pre>
     <p>Log in to <strong>cloud.appwrite.io</strong>, select your project, and confirm the following are created:</p>
 
     <h3>Project &amp; Database IDs</h3>
-    <pre><code>Project ID : 69a53fb00009c20573d6
-Database ID: 69a6d9c9002f3a1c4d7a
-Endpoint   : https://fra.cloud.appwrite.io/v1</code></pre>
+    <pre><code>Project ID : YOUR_PROJECT_ID
+Database ID: YOUR_DATABASE_ID
+Endpoint   : https://YOUR_APPWRITE_ENDPOINT/v1</code></pre>
 
     <h3>Required Collections</h3>
     <p>All collections live in the same database. Create each with these primary keys:</p>
@@ -1222,9 +1398,9 @@ Allowed    : image/jpeg</code></pre>
     <h2 id="gs-env">Environment Config</h2>
     <p>Create a <code>lib/config/app_config.dart</code> file (gitignored) with your Appwrite credentials:</p>
     <pre><code>class AppConfig {
-  static const String endpoint   = 'https://fra.cloud.appwrite.io/v1';
-  static const String projectId  = '69a53fb00009c20573d6';
-  static const String databaseId = '69a6d9c9002f3a1c4d7a';
+  static const String endpoint   = 'https://YOUR_APPWRITE_ENDPOINT/v1';
+  static const String projectId  = 'YOUR_PROJECT_ID';
+  static const String databaseId = 'YOUR_DATABASE_ID';
   static const String bucketId   = 'asset-images';
 }</code></pre>
 
@@ -1263,15 +1439,15 @@ flutter build apk --release --split-per-abi
 
 # Android App Bundle (Play Store)
 flutter build appbundle --release</code></pre>
-    <p>Output APKs will be in <code>build/app/outputs/flutter-apk/</code>. The <code>--split-per-abi</code> flag produces separate APKs for arm64, armeabi-v7a, and x86_64 — use the <code>arm64-v8a</code> build for modern devices including the TECNO KD7.</p>
+    <p>Output APKs will be in <code>build/app/outputs/flutter-apk/</code>. The <code>--split-per-abi</code> flag produces separate APKs for arm64, armeabi-v7a, and x86_64 — use the <code>arm64-v8a</code> build for modern devices including the your Android device.</p>
 
     <h2 id="gs-envvars">All Config Values</h2>
     <div class="table-scroll"><table class="collection-table">
       <thead><tr><th>Key</th><th>Value</th><th>Where used</th></tr></thead>
       <tbody>
-        <tr><td>endpoint</td><td>https://fra.cloud.appwrite.io/v1</td><td>Appwrite SDK init</td></tr>
-        <tr><td>projectId</td><td>69a53fb00009c20573d6</td><td>Appwrite SDK init</td></tr>
-        <tr><td>databaseId</td><td>69a6d9c9002f3a1c4d7a</td><td>All DB calls</td></tr>
+        <tr><td>endpoint</td><td>https://YOUR_APPWRITE_ENDPOINT/v1</td><td>Appwrite SDK init</td></tr>
+        <tr><td>projectId</td><td>YOUR_PROJECT_ID</td><td>Appwrite SDK init</td></tr>
+        <tr><td>databaseId</td><td>YOUR_DATABASE_ID</td><td>All DB calls</td></tr>
         <tr><td>bucketId</td><td>asset-images</td><td>ImageSyncService</td></tr>
         <tr><td>syncTickMs</td><td>1000000 (1000s)</td><td>AppRefreshService</td></tr>
         <tr><td>maxImageBytes</td><td>204800 (200KB)</td><td>flutter_image_compress</td></tr>
@@ -1376,6 +1552,44 @@ flutter build appbundle --release</code></pre>
   </div>
 
   <h2>Data Flow</h2>
+  <div class="highlight-row" style="padding:0;gap:3rem;margin-bottom:2.5rem">
+    <div class="highlight-img" style="background: var(--soil); border-radius:4px; height:240px">
+      <svg viewBox="0 0 300 200" width="280" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <rect x="10" y="75" width="80" height="50" rx="4" fill="#1c2e1f" stroke="#3a7d44" stroke-width="1.2"/>
+        <text x="22" y="97" font-family="DM Mono,monospace" font-size="8" fill="#5aab67">WRITE</text>
+        <text x="22" y="111" font-family="DM Mono,monospace" font-size="7" fill="rgba(224,240,220,.4)">SQLite</text>
+        <path d="M92 100 L118 100" stroke="#3a7d44" stroke-width="1.2" marker-end="url(#a2)"/>
+        <rect x="120" y="75" width="80" height="50" rx="4" fill="#1c2e1f" stroke="#c8a84a" stroke-width="1.2"/>
+        <text x="130" y="97" font-family="DM Mono,monospace" font-size="8" fill="#c8a84a">QUEUE</text>
+        <text x="130" y="111" font-family="DM Mono,monospace" font-size="7" fill="rgba(224,240,220,.4)">sync_queue</text>
+        <path d="M202 100 L228 100" stroke="#c8a84a" stroke-width="1.2" marker-end="url(#a3)"/>
+        <rect x="230" y="75" width="60" height="50" rx="4" fill="#1c2e1f" stroke="#6dbf74" stroke-width="1.2"/>
+        <text x="240" y="97" font-family="DM Mono,monospace" font-size="8" fill="#6dbf74">PUSH</text>
+        <text x="240" y="111" font-family="DM Mono,monospace" font-size="7" fill="rgba(224,240,220,.4)">Appwrite</text>
+        <path d="M260 155 L260 128" stroke="#4a8c6f" stroke-width="1" stroke-dasharray="4 3" marker-end="url(#a4)"/>
+        <text x="210" y="172" font-family="DM Mono,monospace" font-size="7" fill="#4a8c6f">DOWN-SYNC (cursor-based)</text>
+        <defs>
+          <marker id="a2" markerWidth="6" markerHeight="6" refX="3" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="#3a7d44"/></marker>
+          <marker id="a3" markerWidth="6" markerHeight="6" refX="3" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="#c8a84a"/></marker>
+          <marker id="a4" markerWidth="6" markerHeight="6" refX="3" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="#4a8c6f"/></marker>
+        </defs>
+      </svg>
+    </div>
+    <div class="highlight-text">
+      <div class="section-label">Sync Architecture</div>
+      <h2>Write local, sync smart</h2>
+      <p>Every write hits SQLite immediately — the app never waits for a network round-trip. A <code>sync_queue</code> outbox table records each pending operation. <code>SyncService</code> drains the queue when connectivity is available.</p>
+      <p>Down-sync uses cursor-based pagination to pull all collections from Appwrite after every up-sync pass. Conflicts are resolved with "Appwrite wins" and logged for audit.</p>
+      <div class="tag-list">
+        <span class="tag">Outbox Pattern</span>
+        <span class="tag">Cursor Pagination</span>
+        <span class="tag">Conflict Audit</span>
+        <span class="tag">Heartbeat Tick</span>
+      </div>
+    </div>
+  </div>
+
+  <h2>Step-by-step Flow</h2>
   <pre><code>User Action
     │
     ▼
@@ -1440,7 +1654,7 @@ DownSyncService.pull()
   <div class="release">
     <div class="release-meta">
       <div class="release-version">v0.1.0</div>
-      <div class="release-date">2025 — Q2</div>
+      <div class="release-date">2026 — Q1</div>
       <span class="release-badge badge-latest">Latest · Beta</span>
     </div>
     <div class="release-body">
@@ -1481,7 +1695,7 @@ DownSyncService.pull()
   <div class="release">
     <div class="release-meta">
       <div class="release-version">v0.0.3</div>
-      <div class="release-date">2025 — Q1</div>
+      <div class="release-date">2026 — Q1</div>
       <span class="release-badge badge-beta">Alpha</span>
     </div>
     <div class="release-body">
@@ -1509,7 +1723,7 @@ DownSyncService.pull()
   <div class="release">
     <div class="release-meta">
       <div class="release-version">v0.0.2</div>
-      <div class="release-date">2025 — Q1</div>
+      <div class="release-date">2026 — Q1</div>
       <span class="release-badge badge-alpha">Alpha</span>
     </div>
     <div class="release-body">
@@ -1538,7 +1752,7 @@ DownSyncService.pull()
   <div class="release">
     <div class="release-meta">
       <div class="release-version">v0.0.1</div>
-      <div class="release-date">2025 — Q1</div>
+      <div class="release-date">2026 — Q1</div>
       <span class="release-badge badge-alpha">Alpha</span>
     </div>
     <div class="release-body">
@@ -1546,7 +1760,7 @@ DownSyncService.pull()
       <div class="change-group">
         <div class="change-group-label added">✦ Added</div>
         <ul class="change-list">
-          <li>Flutter project initialisation — Android target, TECNO KD7 test device</li>
+          <li>Flutter project initialisation — Android target, your Android device test device</li>
           <li>Appwrite Cloud project and database provisioned (Frankfurt region)</li>
           <li>Initial pubspec with core dependencies</li>
           <li>Basic navigation shell and placeholder screens</li>
@@ -1575,9 +1789,14 @@ DownSyncService.pull()
     return false;
   }
 
-  function scrollDoc(id) {
+  function scrollDoc(id, linkEl) {
+    if (linkEl) {
+      const sidebar = linkEl.closest('.docs-sidebar');
+      if (sidebar) sidebar.querySelectorAll('.sidebar-link').forEach(l => l.classList.remove('active'));
+      linkEl.classList.add('active');
+    }
     const el = document.getElementById(id);
-    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    if (el) setTimeout(() => el.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
     return false;
   }
 
