@@ -431,7 +431,7 @@ class _HistoryTabState extends State<_HistoryTab> {
 
   void _load() {
     final next = _repo.getRecentFinancials();
-    if (mounted) setState(() => _future = next);
+    if (mounted) setState(() { _future = next; });
   }
 
   @override
@@ -464,8 +464,8 @@ class _HistoryTabState extends State<_HistoryTab> {
           color: const Color(0xFF2D6A4F),
           onRefresh: () async {
               final next = _repo.getRecentFinancials();
-              if (mounted) setState(() => _future = next);
-             // await next.catchError((_) {});
+              if (mounted) setState(() { _future = next; });
+              //await next.catchError((_) {});
             },
           child: ListView(
             padding: const EdgeInsets.fromLTRB(20, 20, 20, 40),

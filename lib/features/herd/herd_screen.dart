@@ -33,11 +33,7 @@ class _HerdManagementScreenState extends State<HerdManagementScreen>
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       _refreshSub = AppRefreshService.instance.ticks.listen((_) {
-        if (mounted) {
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (mounted) _refresh();
-          });
-        }
+        if (mounted) _refresh();
       });
     });
   }
@@ -952,7 +948,6 @@ class _LogEventSheetState extends State<_LogEventSheet> {
       if (mounted) setState(() => _saving = false);
     }
   }
-
 
 
   @override

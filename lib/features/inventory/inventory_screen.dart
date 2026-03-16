@@ -27,18 +27,14 @@ class _InventoryScreenState extends State<InventoryScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       _refreshSub = AppRefreshService.instance.ticks.listen((_) {
-        if (mounted) {
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (mounted) _load();
-          });
-        }
+        if (mounted) _load();
       });
     });
   }
 
   void _load() {
     final next = _repo.getAllInventory();
-    if (mounted) setState(() => _future = next);
+    if (mounted) setState(() { _future = next; });
   }
 
   @override

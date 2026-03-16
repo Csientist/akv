@@ -1377,7 +1377,7 @@
     <li><a href="#" onclick="showPage('start')" id="nav-start">Getting Started</a></li>
     <li><a href="#" onclick="showPage('arch')" id="nav-arch">Architecture</a></li>
     <li><a href="#" onclick="showPage('changelog')" id="nav-changelog">Changelog</a></li>
-    <li><span class="nav-badge">Beta v0.1</span></li>
+    <li><span class="nav-badge">Beta v0.2</span></li>
   </ul>
   <button class="nav-hamburger" id="hamburger" aria-label="Toggle menu" onclick="toggleDrawer()">
     <span></span><span></span><span></span>
@@ -1390,7 +1390,7 @@
   <a href="#" onclick="showPage('start');closeDrawer()" id="drawer-start">Getting Started</a>
   <a href="#" onclick="showPage('arch');closeDrawer()" id="drawer-arch">Architecture</a>
   <a href="#" onclick="showPage('changelog');closeDrawer()" id="drawer-changelog">Changelog</a>
-  <span class="nav-badge">Beta v0.1</span>
+  <span class="nav-badge">Beta v0.2</span>
 </div>
 
 <!-- ══════════════════════════ HOME ══════════════════════════ -->
@@ -1665,7 +1665,7 @@
       <a href="#" onclick="showPage('changelog')">Changelog</a>
       <a href="#" onclick="showPage('arch')">Architecture</a>
     </div>
-    <div class="footer-meta">Beta v0.1.0 · Flutter · Appwrite Cloud</div>
+    <div class="footer-meta">Beta v0.2.0 · Flutter · Appwrite Cloud</div>
   </footer>
 </div>
 
@@ -1717,7 +1717,7 @@
         <div class="step-num">1</div>
         <div class="step-body">
           <h4>Clone the repository</h4>
-          <pre><code>git clone https://github.com/Csientist/akv.git
+          <pre><code>git clone https://github.com/your-org/akavango-farm.git
 cd akavango-farm</code></pre>
         </div>
       </div>
@@ -1841,9 +1841,6 @@ flutter build appbundle --release</code></pre>
     </table></div>
 
     <h2 id="gs-known">Known Issues</h2>
-    <div class="callout danger">
-      <strong>setState Future warning</strong> — <code>_InventoryScreenState._load</code> and several other screens call async methods inside <code>setState()</code>. Non-fatal and cosmetic; a refactor of all screen loaders is planned for the next sprint.
-    </div>
     <div class="callout">
       <strong>M-Pesa no-receipt path</strong> — Partial payments via M-Pesa are unsupported when no receipt exists. A "manual M-Pesa entry" option is on the roadmap.
     </div>
@@ -2088,7 +2085,7 @@ Daraja Callback → Cloudflare Worker → Appwrite Function (Go)
   <div class="table-scroll"><table class="collection-table">
     <thead><tr><th>Item</th><th>Status</th><th>Notes</th></tr></thead>
     <tbody>
-      <tr><td>setState Future warning</td><td><span style="color:var(--harvest);font-family:var(--font-mono);font-size:.8rem">COSMETIC</span></td><td>Async refactor needed across all screen loaders</td></tr>
+      <tr><td>setState Future assertion</td><td><span style="color:var(--leaf);font-family:var(--font-mono);font-size:.8rem">FIXED v0.2.0</span></td><td>Block syntax applied across all affected screens</td></tr>
       <tr><td>M-Pesa manual entry</td><td><span style="color:var(--terracotta);font-family:var(--font-mono);font-size:.8rem">PLANNED</span></td><td>No-receipt M-Pesa payments not yet supported</td></tr>
       <tr><td>SQLite migrations</td><td><span style="color:var(--harvest);font-family:var(--font-mono);font-size:.8rem">BETA ONLY</span></td><td>Schema v1 — beta assumes fresh install; migrations come post-beta</td></tr>
     </tbody>
@@ -2103,12 +2100,53 @@ Daraja Callback → Cloudflare Worker → Appwrite Function (Go)
   <h1>Changelog</h1>
   <p class="lead">All notable changes to Akavango Farm Manager are documented here. The project follows <a href="https://semver.org" style="color:var(--terracotta)">Semantic Versioning</a>. Dates are in ISO 8601 format.</p>
 
+  <!-- v0.2.0 -->
+  <div class="release">
+    <div class="release-meta">
+      <div class="release-version">v0.2.0</div>
+      <div class="release-date">2026 — Q1</div>
+      <span class="release-badge badge-latest">Latest · Beta</span>
+    </div>
+    <div class="release-body">
+      <h3>Activity Log Edit, New Event Types &amp; Sync Fixes</h3>
+
+      <div class="change-group">
+        <div class="change-group-label added">✦ Added</div>
+        <ul class="change-list">
+          <li>Activity log edit — tapping the pencil icon on any timeline item opens <code>_LogEventSheet</code> pre-filled with all fields, metadata, and images; save routes to <code>updateAssetEvent()</code></li>
+          <li>New activity types: <code>dryingOff</code> 🧴, <code>isolation</code> 🚧, <code>shearing</code> ✂️</li>
+          <li><code>other</code> 📋 activity type added to both livestock and crop flows, with a free-text description field</li>
+          <li>Date range picker for multi-day activities — <code>medication</code>, <code>dryingOff</code>, <code>isolation</code>, <code>injury</code>, <code>irrigation</code>, <code>weeding</code> now expose an optional end date; displayed as <code>dd/mm/yyyy → dd/mm/yyyy</code> in the timeline and stored in <code>metadata['date_to']</code></li>
+        </ul>
+      </div>
+
+      <div class="change-group">
+        <div class="change-group-label changed">↺ Changed</div>
+        <ul class="change-list">
+          <li><code>vaccination</code> activity type removed — superseded by <code>medication</code></li>
+          <li><code>AssetEvent.displayLabel</code> and <code>.emoji</code> updated for all new and renamed event types</li>
+          <li><code>InventoryItem.copyWith()</code> extended to support all editable fields: <code>itemName</code>, <code>category</code>, <code>unit</code>, <code>reorderLevel</code>, <code>notes</code></li>
+          <li><code>AppRefreshService._tick()</code> now broadcasts twice per cycle — immediately on call (fast local reload) and again after <code>fullSync()</code> completes (fresh remote data)</li>
+          <li><code>AppRefreshService.start()</code> fires an immediate tick on unlock so all screens load without waiting for the first periodic interval</li>
+        </ul>
+      </div>
+
+      <div class="change-group">
+        <div class="change-group-label fixed">✔ Fixed</div>
+        <ul class="change-list">
+          <li><strong>Assertion error resolved</strong> — root cause: Dart arrow-syntax closures <code>() =&gt; _future = next</code> return the assigned <code>Future</code>, triggering Flutter's setState assertion. All affected call sites converted to block syntax <code>() { _future = next; }</code> across <code>inventory_screen</code>, <code>new_sales_screen</code>, and <code>herd_screen</code></li>
+          <li>All screens now refresh after down-sync completes, not only on the next periodic tick</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
   <!-- v0.1.0 -->
   <div class="release">
     <div class="release-meta">
       <div class="release-version">v0.1.0</div>
       <div class="release-date">2026 — Q1</div>
-      <span class="release-badge badge-latest">Latest · Beta</span>
+      <span class="release-badge badge-beta">Beta</span>
     </div>
     <div class="release-body">
       <h3>Initial Beta Release</h3>
@@ -2135,7 +2173,6 @@ Daraja Callback → Cloudflare Worker → Appwrite Function (Go)
       <div class="change-group">
         <div class="change-group-label known">⚠ Known Issues</div>
         <ul class="change-list">
-          <li><code>setState() callback returned a Future</code> warning on <code>_InventoryScreenState._load</code> and related screens — non-fatal, cosmetic; async refactor pending</li>
           <li>Partial payments via M-Pesa unsupported when no receipt exists — manual M-Pesa entry option planned</li>
           <li>SQLite schema version 1 — no migration support; beta assumes fresh install</li>
         </ul>
