@@ -27,13 +27,17 @@ class _HerdManagementScreenState extends State<HerdManagementScreen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
+    _tabController   = TabController(length: 2, vsync: this);
     _livestockFuture = _repo.getActiveAssets(AssetCategory.livestock);
-    _cropFuture = _repo.getActiveAssets(AssetCategory.crop);
+    _cropFuture      = _repo.getActiveAssets(AssetCategory.crop);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       _refreshSub = AppRefreshService.instance.ticks.listen((_) {
-        if (mounted) _refresh();
+        if (mounted) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) _refresh();
+          });
+        }
       });
     });
   }
@@ -48,14 +52,12 @@ class _HerdManagementScreenState extends State<HerdManagementScreen>
   void _refresh() {
     final livestock = _repo.getActiveAssets(AssetCategory.livestock);
     final crop      = _repo.getActiveAssets(AssetCategory.crop);
-    Future.microtask(() {
-      if (mounted) {
-        setState(() {
-        _livestockFuture = livestock;
-        _cropFuture      = crop;
-      });
-      }
+    if (mounted) {
+      setState(() {
+      _livestockFuture = livestock;
+      _cropFuture      = crop;
     });
+    }
   }
 
   @override
@@ -311,10 +313,12 @@ class _AnimalDetailSheetState extends State<_AnimalDetailSheet> {
   void _load() {
     final events = widget.repo.getEventsForAsset(widget.asset.assetId);
     final milk   = widget.repo.getTotalMilkForAsset(widget.asset.assetId);
-    setState(() {
+    if (mounted) {
+      setState(() {
       _eventsFuture = events;
       _totalMilk    = milk;
     });
+    }
   }
 
   Future<void> _loadImages() async {
@@ -443,7 +447,10 @@ class _AnimalDetailSheetState extends State<_AnimalDetailSheet> {
                 if (events.isEmpty) {
                   return _EmptyTimeline();
                 }
-                return _Timeline(events: events);
+                return _Timeline(
+                  events: events,
+                  onEdit: (e) => _showEditEventSheet(context, e),
+                );
               },
             ),
           ],
@@ -460,10 +467,21 @@ class _AnimalDetailSheetState extends State<_AnimalDetailSheet> {
       builder: (_) => _LogEventSheet(
         asset: widget.asset,
         repo: widget.repo,
-        onSaved: () {
-          _load();
-          widget.onRefresh();
-        },
+        onSaved: () { _load(); widget.onRefresh(); },
+      ),
+    );
+  }
+
+  void _showEditEventSheet(BuildContext context, AssetEvent event) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _LogEventSheet(
+        asset:    widget.asset,
+        repo:     widget.repo,
+        existing: event,
+        onSaved:  () { _load(); widget.onRefresh(); },
       ),
     );
   }
@@ -512,12 +530,13 @@ class _Chip extends StatelessWidget {
 
 class _Timeline extends StatelessWidget {
   final List<AssetEvent> events;
-  const _Timeline({required this.events});
+  final void Function(AssetEvent) onEdit;
+  const _Timeline({required this.events, required this.onEdit});
   @override
   Widget build(BuildContext context) {
     return Column(children: events.asMap().entries.map((e) {
       final isLast = e.key == events.length - 1;
-      return _TimelineItem(event: e.value, isLast: isLast);
+      return _TimelineItem(event: e.value, isLast: isLast, onEdit: onEdit);
     }).toList());
   }
 }
@@ -525,13 +544,21 @@ class _Timeline extends StatelessWidget {
 class _TimelineItem extends StatelessWidget {
   final AssetEvent event;
   final bool isLast;
-  const _TimelineItem({required this.event, required this.isLast});
+  final void Function(AssetEvent) onEdit;
+  const _TimelineItem({required this.event, required this.isLast, required this.onEdit});
 
   @override
   Widget build(BuildContext context) {
+    final dateTo   = event.metadata?['date_to'] as String?;
+    final dateLabel = dateTo != null
+        ? '${_fmt(event.recordedAt)} → $dateTo'
+        : _relDate(event.recordedAt);
+    final label = event.eventType == 'other'
+        ? (event.metadata?['activity'] as String? ?? 'Other')
+        : event.displayLabel;
+
     return IntrinsicHeight(
       child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        // Left: dot + line
         Column(children: [
           Container(
             width: 36, height: 36,
@@ -542,14 +569,20 @@ class _TimelineItem extends StatelessWidget {
             Expanded(child: Container(width: 2, color: const Color(0xFFD8E8E0), margin: const EdgeInsets.symmetric(vertical: 4))),
         ]),
         const SizedBox(width: 14),
-        // Right: content
         Expanded(child: Padding(
           padding: EdgeInsets.only(bottom: isLast ? 0 : 16),
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Row(children: [
-              Text(event.displayLabel, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
-              const Spacer(),
-              Text(_relDate(event.recordedAt), style: TextStyle(fontSize: 11, color: Colors.grey.shade400)),
+              Expanded(child: Text(label, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14))),
+              GestureDetector(
+                onTap: () => onEdit(event),
+                child: Padding(
+                  padding: const EdgeInsets.only(left: 8),
+                  child: Icon(Icons.edit_outlined, size: 15, color: Colors.grey.shade400),
+                ),
+              ),
+              const SizedBox(width: 6),
+              Text(dateLabel, style: TextStyle(fontSize: 11, color: Colors.grey.shade400)),
             ]),
             if (event.notes != null && event.notes!.isNotEmpty) ...[
               const SizedBox(height: 4),
@@ -557,11 +590,14 @@ class _TimelineItem extends StatelessWidget {
             ],
             if (event.metadata != null && event.metadata!.isNotEmpty) ...[
               const SizedBox(height: 6),
-              Wrap(spacing: 6, children: event.metadata!.entries.map((m) => Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                decoration: BoxDecoration(color: const Color(0xFFF1F8F6), borderRadius: BorderRadius.circular(6)),
-                child: Text('${m.key}: ${m.value}', style: const TextStyle(fontSize: 11, color: Color(0xFF2D6A4F), fontWeight: FontWeight.w600)),
-              )).toList()),
+              Wrap(spacing: 6, children: event.metadata!.entries
+                  .where((m) => m.key != 'date_to' && m.key != 'activity')
+                  .map((m) => Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(color: const Color(0xFFF1F8F6), borderRadius: BorderRadius.circular(6)),
+                    child: Text('${m.key}: ${m.value}',
+                        style: const TextStyle(fontSize: 11, color: Color(0xFF2D6A4F), fontWeight: FontWeight.w600)),
+                  )).toList()),
             ],
           ]),
         )),
@@ -569,13 +605,16 @@ class _TimelineItem extends StatelessWidget {
     );
   }
 
+  String _fmt(DateTime dt) =>
+      '${dt.day.toString().padLeft(2,'0')}/${dt.month.toString().padLeft(2,'0')}/${dt.year}';
+
   String _relDate(DateTime dt) {
     final diff = DateTime.now().difference(dt);
     if (diff.inMinutes < 60)  return '${diff.inMinutes}m ago';
     if (diff.inHours < 24)    return '${diff.inHours}h ago';
     if (diff.inDays == 1)     return 'Yesterday';
     if (diff.inDays < 7)      return '${diff.inDays}d ago';
-    return '${dt.day}/${dt.month}/${dt.year}';
+    return _fmt(dt);
   }
 }
 
@@ -601,34 +640,50 @@ class _LogEventSheet extends StatefulWidget {
   final Asset asset;
   final LedgerRepository repo;
   final VoidCallback onSaved;
-  const _LogEventSheet({required this.asset, required this.repo, required this.onSaved});
+  final AssetEvent? existing; // non-null = edit mode
+  const _LogEventSheet({
+    required this.asset,
+    required this.repo,
+    required this.onSaved,
+    this.existing,
+  });
   @override
   State<_LogEventSheet> createState() => _LogEventSheetState();
 }
 
 class _LogEventSheetState extends State<_LogEventSheet> {
-  // Generate the eventId upfront so images can be attached before saving.
-  final String _eventId   = const Uuid().v4();
+  late final String _eventId;
   String? _selectedType;
-  final _notesCtrl  = TextEditingController();
-  final _meta1Ctrl  = TextEditingController();
-  final _meta2Ctrl  = TextEditingController();
+  final _notesCtrl      = TextEditingController();
+  final _meta1Ctrl      = TextEditingController();
+  final _meta2Ctrl      = TextEditingController();
+  final _otherLabelCtrl = TextEditingController(); // free-text for 'other' type
   final userId = SessionManager.instance.currentUserId;
 
-  DateTime _recordedAt = DateTime.now();
+  DateTime  _recordedAt = DateTime.now();
+  DateTime? _endDate;              // optional end date for multi-day activities
   bool _saving = false;
   MilkSession _milkSession = MilkSession.am;
   List<FarmImage> _images = [];
 
+  bool get _isEdit      => widget.existing != null;
   bool get _isLivestock => widget.asset.category == AssetCategory.livestock;
 
-  // Event types per category
+  // Types that support a date range (end date picker shown)
+  static const _rangeTypes = {
+    'medication', 'dryingOff', 'isolation', 'injury',
+    'irrigation', 'weeding',
+  };
+  bool get _supportsRange => _rangeTypes.contains(_selectedType);
+
+  // Event types — vaccination removed (covered by medication)
   static const _livestockTypes = [
-    ('vaccination',    '💉', 'Vaccination'),
     ('deworming',      '💊', 'Deworming'),
     ('vetVisit',       '🏥', 'Vet Visit'),
     ('medication',     '💊', 'Medication'),
     ('injury',         '🩹', 'Injury'),
+    ('dryingOff',      '🧴', 'Drying Off'),
+    ('isolation',      '🚧', 'Isolation'),
     ('mating',         '🔗', 'Mating'),
     ('pregnancyCheck', '🔬', 'Pregnancy Check'),
     ('birth',          '🐣', 'Birth'),
@@ -636,8 +691,10 @@ class _LogEventSheetState extends State<_LogEventSheet> {
     ('supplement',     '🧪', 'Supplement'),
     ('weightCheck',    '⚖️',  'Weight Check'),
     ('milkLog',        '🥛', 'Milk Log'),
+    ('shearing',       '✂️',  'Shearing'),
     ('sold',           '💰', 'Sold'),
     ('deceased',       '🕊️', 'Deceased'),
+    ('other',          '📋', 'Other'),
   ];
 
   static const _cropTypes = [
@@ -648,11 +705,79 @@ class _LogEventSheetState extends State<_LogEventSheet> {
     ('irrigation', '💧', 'Irrigation'),
     ('harvest',    '🌾', 'Harvest'),
     ('cropLoss',   '⚠️', 'Crop Loss'),
+    ('other',      '📋', 'Other'),
   ];
 
-  List<(String, String, String)> get _types => _isLivestock ? _livestockTypes : _cropTypes;
+  List<(String, String, String)> get _types =>
+      _isLivestock ? _livestockTypes : _cropTypes;
 
-  // Returns extra metadata fields based on selected type
+  @override
+  void initState() {
+    super.initState();
+    final e = widget.existing;
+    _eventId = e?.eventId ?? const Uuid().v4();
+    if (e != null) {
+      _selectedType = e.eventType;
+      _notesCtrl.text = e.notes ?? '';
+      _recordedAt     = e.recordedAt;
+      // Restore date range if stored
+      if (e.metadata?['date_to'] != null) {
+        _endDate = DateTime.tryParse(e.metadata!['date_to'] as String);
+      }
+      // Restore metadata fields
+      final m = e.metadata ?? {};
+      switch (e.eventType) {
+        case 'weightCheck':
+          _meta1Ctrl.text = m['weight_kg']?.toString() ?? '';
+        case 'milkLog':
+          _meta1Ctrl.text = m['litres']?.toString() ?? '';
+          final s = m['session'] as String?;
+          if (s != null) {
+            _milkSession = MilkSession.values
+                .firstWhere((v) => v.name == s, orElse: () => MilkSession.am);
+          }
+        case 'deworming':
+        case 'medication':
+        case 'dryingOff':
+        case 'isolation':
+          _meta1Ctrl.text = m['drug']?.toString() ?? '';
+          _meta2Ctrl.text = m['dose']?.toString() ?? '';
+        case 'mating':
+          _meta1Ctrl.text = m['sire']?.toString() ?? '';
+        case 'birth':
+          _meta1Ctrl.text = m['offspring_count']?.toString() ?? '';
+          _meta2Ctrl.text = m['offspring_tags']?.toString() ?? '';
+        case 'feedChange':
+          _meta1Ctrl.text = m['feed_type']?.toString() ?? '';
+        case 'harvest':
+          _meta1Ctrl.text = m['yield']?.toString() ?? '';
+          _meta2Ctrl.text = m['unit']?.toString() ?? '';
+        case 'fertilizer':
+        case 'pesticide':
+          _meta1Ctrl.text = m['product']?.toString() ?? '';
+          _meta2Ctrl.text = m['quantity']?.toString() ?? '';
+        case 'sold':
+          _meta1Ctrl.text = m['buyer']?.toString() ?? '';
+          _meta2Ctrl.text = m['amount_kes']?.toString() ?? '';
+        case 'other':
+          _otherLabelCtrl.text = m['activity']?.toString() ?? '';
+      }
+      // Load existing images
+      ImageService.instance
+          .getImages(entityType: ImageEntityType.assetEvent, entityId: _eventId)
+          .then((imgs) { if (mounted) setState(() => _images = imgs); });
+    }
+  }
+
+  @override
+  void dispose() {
+    _notesCtrl.dispose();
+    _meta1Ctrl.dispose();
+    _meta2Ctrl.dispose();
+    _otherLabelCtrl.dispose();
+    super.dispose();
+  }
+
   Widget _metaFields() {
     switch (_selectedType) {
       case 'weightCheck':
@@ -682,11 +807,12 @@ class _LogEventSheetState extends State<_LogEventSheet> {
             ));
           }).toList()),
         ]);
-      case 'vaccination':
       case 'deworming':
       case 'medication':
+      case 'dryingOff':
+      case 'isolation':
         return Column(children: [
-          _MetaField(ctrl: _meta1Ctrl, label: 'Drug / Vaccine name', hint: 'e.g. Ivermectin'),
+          _MetaField(ctrl: _meta1Ctrl, label: 'Drug / Product name', hint: 'e.g. Ivermectin'),
           const SizedBox(height: 12),
           _MetaField(ctrl: _meta2Ctrl, label: 'Dose / Quantity', hint: 'e.g. 5ml'),
         ]);
@@ -719,6 +845,8 @@ class _LogEventSheetState extends State<_LogEventSheet> {
           const SizedBox(height: 12),
           _MetaField(ctrl: _meta2Ctrl, label: 'Sale amount (KES)', hint: 'e.g. 85000', keyboard: TextInputType.number),
         ]);
+      case 'other':
+        return _MetaField(ctrl: _otherLabelCtrl, label: 'Activity description', hint: 'e.g. Hand milking, Shearing');
       default:
         return const SizedBox.shrink();
     }
@@ -726,15 +854,19 @@ class _LogEventSheetState extends State<_LogEventSheet> {
 
   Map<String, dynamic> _buildMetadata() {
     final m = <String, dynamic>{};
+    if (_endDate != null && _supportsRange) {
+      m['date_to'] = _endDate!.toIso8601String().substring(0, 10);
+    }
     switch (_selectedType) {
       case 'weightCheck':
         if (_meta1Ctrl.text.isNotEmpty) m['weight_kg'] = double.tryParse(_meta1Ctrl.text);
       case 'milkLog':
         if (_meta1Ctrl.text.isNotEmpty) m['litres'] = double.tryParse(_meta1Ctrl.text);
         m['session'] = _milkSession.name;
-      case 'vaccination':
       case 'deworming':
       case 'medication':
+      case 'dryingOff':
+      case 'isolation':
         if (_meta1Ctrl.text.isNotEmpty) m['drug'] = _meta1Ctrl.text.trim();
         if (_meta2Ctrl.text.isNotEmpty) m['dose'] = _meta2Ctrl.text.trim();
       case 'mating':
@@ -754,6 +886,8 @@ class _LogEventSheetState extends State<_LogEventSheet> {
       case 'sold':
         if (_meta1Ctrl.text.isNotEmpty) m['buyer'] = _meta1Ctrl.text.trim();
         if (_meta2Ctrl.text.isNotEmpty) m['amount_kes'] = double.tryParse(_meta2Ctrl.text);
+      case 'other':
+        if (_otherLabelCtrl.text.isNotEmpty) m['activity'] = _otherLabelCtrl.text.trim();
     }
     return m;
   }
@@ -782,45 +916,44 @@ class _LogEventSheetState extends State<_LogEventSheet> {
     setState(() => _saving = true);
     try {
       final event = AssetEvent(
-        eventId: _eventId,
-        assetId: widget.asset.assetId,
+        eventId:   _eventId,
+        assetId:   widget.asset.assetId,
         eventType: _selectedType!,
-        notes: _notesCtrl.text.trim().isNotEmpty ? _notesCtrl.text.trim() : null,
-        metadata: _buildMetadata().isNotEmpty ? _buildMetadata() : null,
+        notes:     _notesCtrl.text.trim().isNotEmpty ? _notesCtrl.text.trim() : null,
+        metadata:  _buildMetadata().isNotEmpty ? _buildMetadata() : null,
         recordedAt: _recordedAt,
-        createdBy: userId,
-        createdAt: DateTime.now(),
+        createdBy:  userId,
+        createdAt:  widget.existing?.createdAt ?? DateTime.now(),
       );
 
-      // If milk log, also save to milk_logs table for reporting
-      if (_selectedType == 'milkLog' && _meta1Ctrl.text.isNotEmpty) {
-        final litres = double.tryParse(_meta1Ctrl.text) ?? 0;
-        if (litres > 0) {
-          await widget.repo.saveMilkLog(MilkLog(
-            logId: const Uuid().v4(),
-            assetId: widget.asset.assetId,
-            litres: litres,
-            session: _milkSession,
-            recordedAt: _recordedAt,
-            notes: _notesCtrl.text.trim().isNotEmpty ? _notesCtrl.text.trim() : null,
-            createdBy: userId,
-            createdAt: DateTime.now()
-          ));
+      if (_isEdit) {
+        await widget.repo.updateAssetEvent(event);
+      } else {
+        // Milk log — also save to milk_logs table for reporting
+        if (_selectedType == 'milkLog' && _meta1Ctrl.text.isNotEmpty) {
+          final litres = double.tryParse(_meta1Ctrl.text) ?? 0;
+          if (litres > 0) {
+            await widget.repo.saveMilkLog(MilkLog(
+              logId:      const Uuid().v4(),
+              assetId:    widget.asset.assetId,
+              litres:     litres,
+              session:    _milkSession,
+              recordedAt: _recordedAt,
+              notes:      _notesCtrl.text.trim().isNotEmpty ? _notesCtrl.text.trim() : null,
+              createdBy:  userId,
+              createdAt:  DateTime.now(),
+            ));
+          }
         }
+        await widget.repo.saveAssetEvent(event);
       }
-
-      await widget.repo.saveAssetEvent(event);
       if (mounted) { Navigator.pop(context); widget.onSaved(); }
     } finally {
       if (mounted) setState(() => _saving = false);
     }
   }
 
-  @override
-  void dispose() {
-    _notesCtrl.dispose(); _meta1Ctrl.dispose(); _meta2Ctrl.dispose();
-    super.dispose();
-  }
+
 
   @override
   Widget build(BuildContext context) {
@@ -832,7 +965,8 @@ class _LogEventSheetState extends State<_LogEventSheet> {
             decoration: BoxDecoration(color: Colors.grey.shade300, borderRadius: BorderRadius.circular(2)))),
         const SizedBox(height: 16),
         Row(children: [
-          Text('Log Activity', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
+          Text(_isEdit ? 'Edit Activity' : 'Log Activity',
+              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
           const Spacer(),
           Text(widget.asset.tagName, style: const TextStyle(color: Color(0xFF2D6A4F), fontWeight: FontWeight.w600)),
         ]),
@@ -877,8 +1011,18 @@ class _LogEventSheetState extends State<_LogEventSheet> {
           const SizedBox(height: 14),
         ],
 
-        // Date picker
-        _DateRow(date: _recordedAt, onChanged: (d) => setState(() => _recordedAt = d)),
+        // Date picker(s)
+        _DateRow(date: _recordedAt, label: 'Start date', onChanged: (d) => setState(() => _recordedAt = d)),
+        if (_supportsRange) ...[ 
+          const SizedBox(height: 10),
+          _DateRow(
+            date: _endDate,
+            label: 'End date (optional)',
+            onChanged: (d) => setState(() => _endDate = d),
+            clearable: true,
+            onCleared: () => setState(() => _endDate = null),
+          ),
+        ],
         const SizedBox(height: 14),
 
         // Notes
@@ -913,7 +1057,8 @@ class _LogEventSheetState extends State<_LogEventSheet> {
           ),
           child: _saving
               ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5))
-              : const Text('Save Activity', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
+              : Text(_isEdit ? 'Save Changes' : 'Save Activity',
+                  style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
         ),
         const SizedBox(height: 8),
       ])),
@@ -922,22 +1067,41 @@ class _LogEventSheetState extends State<_LogEventSheet> {
 }
 
 class _DateRow extends StatelessWidget {
-  final DateTime date;
+  final DateTime? date;
+  final String label;
   final ValueChanged<DateTime> onChanged;
-  const _DateRow({required this.date, required this.onChanged});
+  final bool clearable;
+  final VoidCallback? onCleared;
+
+  const _DateRow({
+    required this.date,
+    required this.onChanged,
+    this.label    = 'Date',
+    this.clearable = false,
+    this.onCleared,
+  });
 
   @override
   Widget build(BuildContext context) {
+    final hasDate = date != null;
+    final display = hasDate
+        ? '${date!.day.toString().padLeft(2,'0')}/'
+          '${date!.month.toString().padLeft(2,'0')}/'
+          '${date!.year}'
+        : 'Not set';
+
     return GestureDetector(
       onTap: () async {
         final picked = await showDatePicker(
           context: context,
-          initialDate: date,
+          initialDate: date ?? DateTime.now(),
           firstDate: DateTime(2000),
-          lastDate: DateTime.now(),
-          helpText: 'When did this happen?',
+          lastDate: DateTime.now().add(const Duration(days: 365)),
           builder: (ctx, child) => Theme(
-            data: Theme.of(ctx).copyWith(colorScheme: Theme.of(ctx).colorScheme.copyWith(primary: const Color(0xFF2D6A4F))),
+            data: Theme.of(ctx).copyWith(
+                colorScheme: Theme.of(ctx)
+                    .colorScheme
+                    .copyWith(primary: const Color(0xFF2D6A4F))),
             child: child!,
           ),
         );
@@ -945,18 +1109,31 @@ class _DateRow extends StatelessWidget {
       },
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-        decoration: BoxDecoration(color: Colors.white,
-            border: Border.all(color: const Color(0xFFD8E8E0)), borderRadius: BorderRadius.circular(12)),
+        decoration: BoxDecoration(
+            color: Colors.white,
+            border: Border.all(color: const Color(0xFFD8E8E0)),
+            borderRadius: BorderRadius.circular(12)),
         child: Row(children: [
-          const Icon(Icons.calendar_today_outlined, size: 18, color: Color(0xFF2D6A4F)),
+          Icon(Icons.calendar_today_outlined, size: 18,
+              color: hasDate ? const Color(0xFF2D6A4F) : Colors.grey.shade400),
           const SizedBox(width: 10),
           Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            const Text('Date', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: Color(0xFF52796F))),
-            Text('${date.day.toString().padLeft(2,'0')}/${date.month.toString().padLeft(2,'0')}/${date.year}',
-                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+            Text(label,
+                style: const TextStyle(fontSize: 10,
+                    fontWeight: FontWeight.w600, color: Color(0xFF52796F))),
+            Text(display,
+                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600,
+                    color: hasDate ? Colors.black87 : Colors.grey.shade400)),
           ]),
           const Spacer(),
-          Text('Tap to change', style: TextStyle(fontSize: 11, color: Colors.grey.shade400)),
+          if (clearable && hasDate)
+            GestureDetector(
+              onTap: onCleared,
+              child: Icon(Icons.close, size: 16, color: Colors.grey.shade400),
+            )
+          else
+            Text('Tap to set',
+                style: TextStyle(fontSize: 11, color: Colors.grey.shade400)),
         ]),
       ),
     );

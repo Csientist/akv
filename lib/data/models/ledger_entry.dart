@@ -464,6 +464,9 @@ class AssetEvent {
       'vetVisit':       'Vet Visit',
       'medication':     'Medication',
       'injury':         'Injury',
+      'dryingOff':      'Drying Off',
+      'isolation':      'Isolation',
+      'shearing':       'Shearing',
       'mating':         'Mating',
       'pregnancyCheck': 'Pregnancy Check',
       'birth':          'Birth',
@@ -480,6 +483,7 @@ class AssetEvent {
       'irrigation':     'Irrigation',
       'harvest':        'Harvest',
       'cropLoss':       'Crop Loss',
+      'other':          'Other',
     };
     return labels[eventType] ?? eventType;
   }
@@ -491,6 +495,9 @@ class AssetEvent {
       'vetVisit':       '🏥',
       'medication':     '💊',
       'injury':         '🩹',
+      'dryingOff':      '🧴',
+      'isolation':      '🚧',
+      'shearing':       '✂️',
       'mating':         '🔗',
       'pregnancyCheck': '🔬',
       'birth':          '🐣',
@@ -507,6 +514,7 @@ class AssetEvent {
       'irrigation':     '💧',
       'harvest':        '🌾',
       'cropLoss':       '⚠️',
+      'other':          '📋',
     };
     return emojis[eventType] ?? '📋';
   }

@@ -277,6 +277,23 @@ class LedgerRepository {
     return stamped;
   }
 
+  Future<AssetEvent> updateAssetEvent(AssetEvent event) async {
+    final db = await _db.database;
+    await db.transaction((txn) async {
+      await txn.update(
+        'asset_events',
+        event.toMap(),
+        where: 'event_id = ?',
+        whereArgs: [event.eventId],
+      );
+      await _db.addToQueue(txn,
+          recordId:  event.eventId,
+          tableName: 'asset_events',
+          operation: 'UPDATE');
+    });
+    return event;
+  }
+
   // ── Milk Logs ──────────────────────────────────────────────────────────────
 
   Future<MilkLog> saveMilkLog(MilkLog log) async {

@@ -24,10 +24,19 @@ void main() async {
   // 1. Ensure Flutter binding is ready before calling native code
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Initialize desktop SQLite ONLY if we are NOT on the web
-  if (!kIsWeb && (Platform.isWindows || Platform.isLinux || Platform.isMacOS)) {
-    sqfliteFfiInit();
-    databaseFactory = databaseFactoryFfi;
+  // Initialize desktop SQLite — must happen BEFORE any database call.
+  // sqflite on mobile uses the native SQLite bundled with Android/iOS.
+  // On Windows/Linux/macOS we need the FFI bridge instead.
+  if (!kIsWeb) {
+    try {
+      if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
+        sqfliteFfiInit();
+        databaseFactory = databaseFactoryFfi;
+      }
+    } catch (_) {
+      // Platform.isXxx throws on web — kIsWeb guard above should prevent
+      // this, but belt-and-suspenders in case of unusual build targets.
+    }
   }
 
   // 2. Lock to portrait mode
