@@ -12,7 +12,10 @@ import 'session_manager.dart';
 class SyncService {
   final LocalDb _db;
   final AppwriteClient _remote;
-  bool _isSyncing = false;
+
+  // Static lock — SyncService() is instantiated fresh each call site,
+  // so an instance-level bool was never actually guarding anything.
+  static bool _isSyncing = false;
 
   static const int _maxRetries = 5;
 
@@ -231,10 +234,11 @@ class SyncService {
 
   void listenForConnectivity() {
     Connectivity().onConnectivityChanged.listen((List<ConnectivityResult> results) {
-      // Hardening: Check if the list contains anything OTHER than 'none'
       if (!results.contains(ConnectivityResult.none)) {
-        Log.i('[SyncService] Network restored — triggering sync.');
-        processQueue();
+        Log.i('[Sync] Network restored — triggering full sync.');
+        // Full bidirectional sync: push queued writes AND pull any records
+        // another device pushed while we were offline.
+        SyncService().fullSync();
       }
     });
   }

@@ -1377,7 +1377,7 @@
     <li><a href="#" onclick="showPage('start')" id="nav-start">Getting Started</a></li>
     <li><a href="#" onclick="showPage('arch')" id="nav-arch">Architecture</a></li>
     <li><a href="#" onclick="showPage('changelog')" id="nav-changelog">Changelog</a></li>
-    <li><span class="nav-badge">Beta v0.2</span></li>
+    <li><span class="nav-badge">Beta v0.2.1</span></li>
   </ul>
   <button class="nav-hamburger" id="hamburger" aria-label="Toggle menu" onclick="toggleDrawer()">
     <span></span><span></span><span></span>
@@ -1390,7 +1390,7 @@
   <a href="#" onclick="showPage('start');closeDrawer()" id="drawer-start">Getting Started</a>
   <a href="#" onclick="showPage('arch');closeDrawer()" id="drawer-arch">Architecture</a>
   <a href="#" onclick="showPage('changelog');closeDrawer()" id="drawer-changelog">Changelog</a>
-  <span class="nav-badge">Beta v0.2</span>
+  <span class="nav-badge">Beta v0.2.1</span>
 </div>
 
 <!-- ══════════════════════════ HOME ══════════════════════════ -->
@@ -1665,7 +1665,7 @@
       <a href="#" onclick="showPage('changelog')">Changelog</a>
       <a href="#" onclick="showPage('arch')">Architecture</a>
     </div>
-    <div class="footer-meta">Beta v0.2.0 · Flutter · Appwrite Cloud</div>
+    <div class="footer-meta">Beta v0.2.1 · Flutter · Appwrite Cloud</div>
   </footer>
 </div>
 
@@ -2100,12 +2100,42 @@ Daraja Callback → Cloudflare Worker → Appwrite Function (Go)
   <h1>Changelog</h1>
   <p class="lead">All notable changes to Akavango Farm Manager are documented here. The project follows <a href="https://semver.org" style="color:var(--terracotta)">Semantic Versioning</a>. Dates are in ISO 8601 format.</p>
 
+  <!-- v0.2.1 -->
+  <div class="release">
+    <div class="release-meta">
+      <div class="release-version">v0.2.1</div>
+      <div class="release-date">2026 — Q1</div>
+      <span class="release-badge badge-latest">Latest · Beta</span>
+    </div>
+    <div class="release-body">
+      <h3>Sync Orchestration — Internal Patch</h3>
+      <p style="font-size:.88rem;color:#2e4a32;margin-bottom:1.2rem;">Internal orchestration changes only. No new features, no schema changes, no UI changes. Behaviour is identical when online — patch purely improves offline behaviour and reduces unnecessary network calls.</p>
+
+      <div class="change-group">
+        <div class="change-group-label changed">↺ Changed — <code style="font-size:.7rem;letter-spacing:0;text-transform:none">app_refresh_service.dart</code></div>
+        <ul class="change-list">
+          <li>Pre-flight connectivity check added to <code>_tick()</code> — if offline, the UI broadcast still fires (screens reload from local SQLite immediately) but the sync is skipped entirely, making zero API calls. Previously the tick would enter <code>_runSyncLoop</code>, travel through the connectivity gate inside it, and then abort — wasting the async overhead of starting the call chain</li>
+          <li><code>nudge()</code> decoupled from sync — it now only broadcasts to UI screens and no longer triggers <code>fullSync()</code>. Writes are already queued in the up-sync outbox and will be pushed on the next connectivity event or periodic tick. Running a full bidirectional sync on every write was adding latency with no benefit, as the immediate down-sync pass would find nothing new</li>
+          <li><code>connectivity_plus</code> import added — required for the pre-flight check in <code>_tick()</code></li>
+        </ul>
+      </div>
+
+      <div class="change-group">
+        <div class="change-group-label changed">↺ Changed — <code style="font-size:.7rem;letter-spacing:0;text-transform:none">sync_service.dart</code></div>
+        <ul class="change-list">
+          <li><code>_isSyncing</code> promoted to <code>static bool</code> — the sync guard was instance-level, but <code>SyncService()</code> is instantiated fresh at every call site, so each new instance started with <code>_isSyncing = false</code>, making the concurrency guard ineffective. Promoting to <code>static</code> makes it a true process-wide lock</li>
+          <li><code>listenForConnectivity</code> now triggers <code>fullSync()</code> instead of <code>processQueue()</code> on reconnect — ensures down-sync runs immediately on connectivity restore, pulling any records pushed from another device while offline. Previously only the up-sync queue was processed on reconnection, leaving down-sync delayed by up to 1000 seconds</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
   <!-- v0.2.0 -->
   <div class="release">
     <div class="release-meta">
       <div class="release-version">v0.2.0</div>
       <div class="release-date">2026 — Q1</div>
-      <span class="release-badge badge-latest">Latest · Beta</span>
+      <span class="release-badge badge-beta">Beta</span>
     </div>
     <div class="release-body">
       <h3>Activity Log Edit, New Event Types &amp; Sync Fixes</h3>
@@ -2250,7 +2280,7 @@ Daraja Callback → Cloudflare Worker → Appwrite Function (Go)
         <div class="change-group-label added">✦ Added</div>
         <ul class="change-list">
           <li>Flutter project initialisation — Android target, your Android device test device</li>
-          <li>Appwrite Cloud project and database provisioned</li>
+          <li>Appwrite Cloud project and database provisioned (Frankfurt region)</li>
           <li>Initial pubspec with core dependencies</li>
           <li>Basic navigation shell and placeholder screens</li>
         </ul>

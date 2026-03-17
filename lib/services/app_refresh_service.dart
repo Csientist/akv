@@ -1,5 +1,6 @@
 import 'dart:async';
 import '../core/logger.dart';
+import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/widgets.dart';
 import 'image_service.dart';
 import 'sync_service.dart';
@@ -77,12 +78,13 @@ class AppRefreshService with WidgetsBindingObserver {
     }
   }
 
-  /// Immediately fire a refresh tick — call after any write operation
-  /// (save sale, record payment, add animal, etc.) so all subscribed
-  /// screens update without waiting for the next 60s interval.
+  /// Fire an immediate UI refresh after a write operation.
+  /// Screens reload the just-written record from local SQLite instantly.
+  /// Sync to Appwrite is handled by the queue — no need to trigger a full
+  /// sync on every write, which adds latency for no benefit.
   void nudge() {
     Log.i('[AppRefresh] Nudged.');
-    _tick();
+    if (!_controller.isClosed) _controller.add(null);
     _restartTimer();
   }
 
@@ -97,14 +99,21 @@ class AppRefreshService with WidgetsBindingObserver {
 
   void _tick() {
     if (_controller.isClosed) return;
-    // First broadcast — screens reload immediately from whatever SQLite has now.
+    // Broadcast immediately — screens reload from local SQLite right away.
     _controller.add(null);
-    // Run sync, then broadcast again so screens pick up newly pulled data.
-    // catchError keeps failures silent — sync errors are logged inside SyncService.
-    SyncService().fullSync().then((_) {
-      if (!_controller.isClosed) _controller.add(null);
-    }).catchError((e) {
-      Log.e('[AppRefresh] Background sync error: $e');
+    // Pre-flight connectivity check before attempting any network calls.
+    // If offline: skip sync entirely, saving all API call overhead.
+    // If online: run full sync, then broadcast again with fresh data.
+    Connectivity().checkConnectivity().then((results) {
+      if (results.contains(ConnectivityResult.none)) {
+        Log.i('[AppRefresh] Offline — skipping sync on this tick.');
+        return;
+      }
+      SyncService().fullSync().then((_) {
+        if (!_controller.isClosed) _controller.add(null);
+      }).catchError((e) {
+        Log.e('[AppRefresh] Background sync error: $e');
+      });
     });
   }
 }
