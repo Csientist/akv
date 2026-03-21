@@ -47,3 +47,4 @@ app.*.map.json
 # Keystore and Secret Properties
 android/key.properties
 *.jks
+/lib/core/secrets.dart

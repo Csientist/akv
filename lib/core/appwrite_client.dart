@@ -1,5 +1,6 @@
 import 'package:appwrite/appwrite.dart';
 import 'logger.dart';
+import '../core/secrets.dart';
 
 class AppwriteClient {
   static final AppwriteClient instance = AppwriteClient._internal();
@@ -12,9 +13,9 @@ class AppwriteClient {
   late final Realtime realtime;
 
   // ── Replace these with your Appwrite project values ──────────────────────
-  static const _endpoint      = 'https://fra.cloud.appwrite.io/v1';
-  static const kProjectId     = '69a53fb00009c20573d6';  // k-prefix avoids clash with Client.projectId (Appwrite SDK 12+)
-  static const kDatabaseId    = '69a6d9c9002f3a1c4d7a';  // k-prefix for consistency
+  static const _endpoint      = Secrets.appwriteEndpoint;
+  static const kProjectId      = Secrets.appwriteProjectId;
+  static const kDatabaseId      = Secrets.appwriteDatabaseId;
 
   // Collection IDs (must match Appwrite console)
   static const colLedger          = 'ledger_entries';
@@ -27,7 +28,7 @@ class AppwriteClient {
   static const colSyncConflicts   = 'sync_conflicts';
 
   // Storage bucket IDs
-  static const bucketAssetImages  = '69a8620e00386a4836be';
+  static const bucketAssetImages  = Secrets.bucketAssetImages;
 
   // asset_images Appwrite collection ID (metadata — separate from the Storage bucket)
   static const colAssetImages     = 'asset_images';

@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:appwrite/appwrite.dart';
 import '../core/appwrite_client.dart';
+import '../core/secrets.dart';
 import '../core/logger.dart';
 
 // ── Result type ───────────────────────────────────────────────────────────────
@@ -44,7 +45,7 @@ class MpesaService {
 
   /// The Appwrite Function ID from your Appwrite Console.
   /// Set this once here — used by both initiatePayment calls.
-  static const _stkFunctionId = '69a7e7520029ca740155';
+  static const _stkFunctionId = Secrets.akavangoApiFunctionId;
 
   // ── Phone formatting ───────────────────────────────────────────────────────
   // Go function also sanitizes, but we do it here too so the log is clean
@@ -96,6 +97,7 @@ class MpesaService {
           'account_reference': transactionId,
         }),
         // Don't await — we want the function to run and Safaricom to callback
+        path: '/mpesa/stk-push',
         xasync: false,
       );
 
