@@ -25,7 +25,7 @@ export default {
         body: JSON.stringify({
           body: requestBody,
           method: "POST",
-          path: "/mpesa/callback",  // ← routes to handleMpesaCallback
+          path: new URL(request.url).pathname.replace(/^\/akavango/, "") || "/mpesa/callback",
           async: true               // fire-and-forget; we ack Safaricom immediately
         })
       });
