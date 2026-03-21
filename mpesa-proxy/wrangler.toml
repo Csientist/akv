@@ -15,3 +15,7 @@ invocation_logs = true
 enabled = false
 persist = true
 head_sampling_rate = 1
+
+[[routes]]
+pattern = "33373984.xyz/akavango/*"
+zone_name = "33373984.xyz"
