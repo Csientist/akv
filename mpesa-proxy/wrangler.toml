@@ -1,4 +1,4 @@
-name = "mpesa-appwrite-proxy"
+name = "akavango-callback-proxy"
 main = "index.js"
 compatibility_date = "2024-03-06"
 [observability]
