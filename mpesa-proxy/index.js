@@ -6,41 +6,41 @@ export default {
 
     try {
       const requestBody = await request.text();
-      console.log("1. Received payload from Daraja:", requestBody);
-      
-      // 2. Your exact IDs
-      const appwriteProjectID = "69a53fb00009c20573d6"; 
-      const appwriteFunctionID = "69a7f6ca00157f5ebd2d";
+      console.log("[proxy] received payload from Daraja:", requestBody);
+
+      const appwriteProjectID = env.AKAVANGO_API_PROJECT_ID
+      // akavango-api function ID — update this after deploying the new function
+      const appwriteFunctionID = env.AKAVANGO_API_FUNCTION_ID;
       const appwriteEndpoint = `https://fra.cloud.appwrite.io/v1/functions/${appwriteFunctionID}/executions`;
-      console.log("2. Forwarding to:", appwriteEndpoint);
+
+      console.log("[proxy] forwarding to:", appwriteEndpoint);
 
       const appwriteResponse = await fetch(appwriteEndpoint, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           "X-Appwrite-Project": appwriteProjectID,
-          "X-Appwrite-Key": env.APPWRITE_API_KEY 
+          // No API key here — /mpesa/callback is a public route in the function
         },
         body: JSON.stringify({
           body: requestBody,
           method: "POST",
-          path: "/",
-          async: false
+          path: "/mpesa/callback",  // ← routes to handleMpesaCallback
+          async: true               // fire-and-forget; we ack Safaricom immediately
         })
       });
 
-      const responseText = await appwriteResponse.text();
-      console.log(`Appwrite Response (${appwriteResponse.status}):`, responseText);
-
-      // 5. Tell Safaricom we received it
-      return new Response(JSON.stringify({ "ResultCode": 0, "ResultDesc": "Success" }), { 
-        status: 200,
-        headers: { "Content-Type": "application/json" }
-      });
+      console.log(`[proxy] Appwrite status: ${appwriteResponse.status}`);
 
     } catch (error) {
-      console.error("Worker Error:", error);
-      return new Response("Error caught, but acknowledged", { status: 200 });
+      // Log but never let Safaricom see a 5xx — they will retry aggressively
+      console.error("[proxy] error:", error);
     }
+
+    // Always ack Safaricom
+    return new Response(JSON.stringify({ "ResultCode": 0, "ResultDesc": "Success" }), {
+      status: 200,
+      headers: { "Content-Type": "application/json" }
+    });
   }
 };
