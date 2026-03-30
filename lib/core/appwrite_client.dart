@@ -26,6 +26,7 @@ class AppwriteClient {
   static const colMilkLogs        = 'milk_logs';
   static const colPartialPayments = 'partial_payments';
   static const colSyncConflicts   = 'sync_conflicts';
+  static const colFlockLogs       = 'flock_logs';
 
   // Storage bucket IDs
   static const bucketAssetImages  = Secrets.bucketAssetImages;

@@ -479,4 +479,89 @@ class LedgerRepository {
       recentTransactions:    recentTransactions,
     );
   }
+
+  // ── Phase 2: Feed & Pasture Management (Flock Logs) ────────────────────────
+
+  Future<FlockLog> saveFlockLog(FlockLog log) async {
+    final db = await _db.database;
+    final stamped = log.copyWith(createdBy: _uid);
+    
+    await db.transaction((txn) async {
+      await txn.insert('flock_logs', stamped.toMap(), conflictAlgorithm: ConflictAlgorithm.replace);
+      await _db.addToQueue(txn, recordId: stamped.logId, tableName: 'flock_logs');
+    });
+    
+    SyncService().processQueue();
+    return stamped;
+  }
+
+  Future<List<FlockLog>> getFlockLogs({int limit = 50}) async {
+    final db = await _db.database;
+    final rows = await db.query(
+      'flock_logs',
+      where: 'created_by = ?',
+      whereArgs: [_uid],
+      orderBy: 'recorded_at DESC',
+      limit: limit,
+    );
+    return rows.map(FlockLog.fromMap).toList();
+  }
+
+  // ── Phase 3: Monthly KPI Dashboard ──────────────────────────────────────────
+
+  Future<MonthlySummary> getMonthlySummary() async {
+    final db = await _db.database;
+    
+    // 1. Current Active Flock Size
+    final flockCount = await db.rawQuery('''
+      SELECT COUNT(*) as count FROM assets 
+      WHERE status = 'active' AND category = 'livestock' AND created_by = ?
+    ''', [_uid]);
+
+    // 2. Births This Month
+    final births = await db.rawQuery('''
+      SELECT COUNT(*) as count FROM asset_events 
+      WHERE event_type = 'birth' AND created_by = ?
+        AND strftime('%Y-%m', recorded_at) = strftime('%Y-%m', 'now')
+    ''', [_uid]);
+
+    // 3. Deaths This Month
+    final deaths = await db.rawQuery('''
+      SELECT COUNT(*) as count FROM asset_events 
+      WHERE (event_type = 'deceased' OR event_type = 'cropLoss') AND created_by = ?
+        AND strftime('%Y-%m', recorded_at) = strftime('%Y-%m', 'now')
+    ''', [_uid]);
+
+    // 4. Financials: Total Income This Month
+    final income = await db.rawQuery('''
+      SELECT SUM(amount) as total FROM financials 
+      WHERE transaction_type = 'sale' AND payment_status != 'failed' AND created_by = ?
+        AND strftime('%Y-%m', created_at) = strftime('%Y-%m', 'now')
+    ''', [_uid]);
+
+    // 5. Financials: Total Purchases This Month
+    final expenses = await db.rawQuery('''
+      SELECT SUM(amount) as total FROM financials 
+      WHERE transaction_type = 'purchase' AND payment_status != 'failed' AND created_by = ?
+        AND strftime('%Y-%m', created_at) = strftime('%Y-%m', 'now')
+    ''', [_uid]);
+    
+    // 6. Feed Costs This Month (From Phase 2 Flock Logs)
+    final feedCosts = await db.rawQuery('''
+      SELECT SUM(feed_cost) as total FROM flock_logs 
+      WHERE created_by = ?
+        AND strftime('%Y-%m', recorded_at) = strftime('%Y-%m', 'now')
+    ''', [_uid]);
+
+    final baseExpenses = (expenses.first['total'] as num?)?.toDouble() ?? 0.0;
+    final extraFeedCosts = (feedCosts.first['total'] as num?)?.toDouble() ?? 0.0;
+
+    return MonthlySummary(
+      flockSize: flockCount.first['count'] as int? ?? 0,
+      birthsThisMonth: births.first['count'] as int? ?? 0,
+      deathsThisMonth: deaths.first['count'] as int? ?? 0,
+      totalIncome: (income.first['total'] as num?)?.toDouble() ?? 0.0,
+      totalExpenses: baseExpenses + extraFeedCosts,
+    );
+  }
 }

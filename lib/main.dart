@@ -19,6 +19,7 @@ import 'features/herd/herd_screen.dart';
 import 'features/inventory/inventory_screen.dart';
 import 'features/dashboard/dashboard_screen.dart';
 import 'features/auth/auth_gate.dart';
+import 'features/flock/flock_logs_screen.dart'; // We will create this next
 
 void main() async {
   // 1. Ensure Flutter binding is ready before calling native code
@@ -170,6 +171,7 @@ class _AppShellState extends State<AppShell> {
     _NavItem(label: 'Sales',     icon: Icons.receipt_long_outlined,  activeIcon: Icons.receipt_long),
     _NavItem(label: 'Herd',      icon: Icons.pets_outlined,          activeIcon: Icons.pets),
     _NavItem(label: 'Inventory', icon: Icons.inventory_2_outlined,   activeIcon: Icons.inventory_2),
+    _NavItem(label: 'Pasture',   icon: Icons.grass_outlined,         activeIcon: Icons.grass), // New Tab
   ];
 
   final List<Widget> _screens = [
@@ -177,6 +179,7 @@ class _AppShellState extends State<AppShell> {
     const NewSaleScreen(),
     const HerdManagementScreen(),
     const InventoryScreen(),
+    const FlockLogsScreen(), // New Screen
   ];
 
   @override

@@ -426,7 +426,7 @@
   /* ─── FEATURE CARDS ─── */
   .feature-grid {
     display: grid;
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(4, 1fr);
     gap: 1.5px;
     background: var(--straw);
     border: 1.5px solid var(--straw);
@@ -1023,6 +1023,8 @@
   .feature-grid .feature-card:nth-child(4) { transition-delay: .24s; }
   .feature-grid .feature-card:nth-child(5) { transition-delay: .32s; }
   .feature-grid .feature-card:nth-child(6) { transition-delay: .40s; }
+  .feature-grid .feature-card:nth-child(7) { transition-delay: .48s; }
+  .feature-grid .feature-card:nth-child(8) { transition-delay: .56s; }
 
   /* Changelog release entries slide in */
   .release {
@@ -1034,6 +1036,7 @@
   .release:nth-child(2) { transition-delay: .1s; }
   .release:nth-child(3) { transition-delay: .2s; }
   .release:nth-child(4) { transition-delay: .3s; }
+  .release:nth-child(5) { transition-delay: .4s; }
 
   /* Arch cards stagger */
   .arch-card {
@@ -1363,10 +1366,8 @@
 </head>
 <body>
 
-<!-- ══════════════════════════ NAV ══════════════════════════ -->
 <nav>
   <a href="#" class="nav-brand" onclick="showPage('home')">
-    <!-- LOGO: Replace src with your actual logo path, e.g. src="assets/logo.png" -->
     <div class="logo-mark" id="nav-logo-mark">
       <img src="assets/logo.png" alt="Akavango Logo" onerror="this.parentElement.classList.add('no-logo');this.style.display='none'">
     </div>
@@ -1377,26 +1378,23 @@
     <li><a href="#" onclick="showPage('start')" id="nav-start">Getting Started</a></li>
     <li><a href="#" onclick="showPage('arch')" id="nav-arch">Architecture</a></li>
     <li><a href="#" onclick="showPage('changelog')" id="nav-changelog">Changelog</a></li>
-    <li><span class="nav-badge">Beta v0.2.1</span></li>
+    <li><span class="nav-badge">Beta v0.3.0</span></li>
   </ul>
   <button class="nav-hamburger" id="hamburger" aria-label="Toggle menu" onclick="toggleDrawer()">
     <span></span><span></span><span></span>
   </button>
 </nav>
 
-<!-- Mobile drawer -->
 <div class="nav-drawer" id="nav-drawer">
   <a href="#" onclick="showPage('home');closeDrawer()" id="drawer-home">Overview</a>
   <a href="#" onclick="showPage('start');closeDrawer()" id="drawer-start">Getting Started</a>
   <a href="#" onclick="showPage('arch');closeDrawer()" id="drawer-arch">Architecture</a>
   <a href="#" onclick="showPage('changelog');closeDrawer()" id="drawer-changelog">Changelog</a>
-  <span class="nav-badge">Beta v0.2.1</span>
+  <span class="nav-badge">Beta v0.3.0</span>
 </div>
 
-<!-- ══════════════════════════ HOME ══════════════════════════ -->
 <div id="page-home" class="page active">
 
-  <!-- HERO -->
   <div class="hero">
     <div class="hero-left">
       <div class="hero-eyebrow">Flutter · Appwrite · Local-First</div>
@@ -1409,9 +1407,7 @@
     </div>
     <div class="hero-right">
       <div class="hero-visual">
-        <!-- ── SCREEN MOCKUP SHOWCASE ── -->
         <div class="screen-showcase">
-          <!-- Screen 1: Dashboard -->
           <div class="mock-phone mock-back-left">
             <div class="mock-shell">
               <div class="mock-notch"></div>
@@ -1446,7 +1442,6 @@
             </div>
           </div>
 
-          <!-- Screen 2: Dashboard (center, largest) -->
           <div class="mock-phone mock-center">
             <div class="mock-shell">
               <div class="mock-notch"></div>
@@ -1459,7 +1454,6 @@
                   <div style="font-family:'Playfair Display',serif;font-size:11px;color:#e0f0dc">Akavango</div>
                   <div class="mock-sync-dot"><span></span>Synced</div>
                 </div>
-                <!-- Stats row -->
                 <div class="mock-stats-row">
                   <div class="mock-stat-card">
                     <div class="mock-stat-num">24</div>
@@ -1474,7 +1468,6 @@
                     <div class="mock-stat-label">Sales</div>
                   </div>
                 </div>
-                <!-- Herd card -->
                 <div style="padding:0 8px;margin-bottom:6px">
                   <div style="background:#1c2e1f;border-radius:4px;padding:8px;border:1px solid #2e5e35;display:flex;gap:8px;align-items:center">
                     <div style="width:32px;height:32px;border-radius:3px;background:#2e5e35;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:14px">🐄</div>
@@ -1484,7 +1477,6 @@
                     </div>
                   </div>
                 </div>
-                <!-- Milk chart bars -->
                 <div style="padding:0 8px">
                   <div style="background:#1c2e1f;border-radius:4px;padding:8px;border:1px solid #2e5e35">
                     <div style="font-family:DM Mono,monospace;font-size:7px;color:#5aab67;margin-bottom:6px">MILK LOG — THIS WEEK</div>
@@ -1499,7 +1491,6 @@
                     </div>
                   </div>
                 </div>
-                <!-- Bottom nav -->
                 <div class="mock-bottomnav">
                   <div class="mock-nav-item active">🏠</div>
                   <div class="mock-nav-item">🐄</div>
@@ -1510,7 +1501,6 @@
             </div>
           </div>
 
-          <!-- Screen 3: Financials -->
           <div class="mock-phone mock-back-right">
             <div class="mock-shell">
               <div class="mock-notch"></div>
@@ -1552,7 +1542,6 @@
     </div>
   </div>
 
-  <!-- FEATURES STRIP -->
   <div class="features-strip">
     <div class="features-strip-track">
       <div class="feature-chip"><div class="dot"></div><span>Offline-first SQLite</span></div>
@@ -1563,10 +1552,9 @@
       <div class="feature-chip"><div class="dot" style="background:var(--harvest)"></div><span>PIN auth layer</span></div>
       <div class="feature-chip"><div class="dot" style="background:var(--river)"></div><span>Bidirectional sync</span></div>
       <div class="feature-chip"><div class="dot"></div><span>Appwrite Functions · Go</span></div>
-      <div class="feature-chip"><div class="dot" style="background:var(--harvest)"></div><span>Cloudflare Workers</span></div>
+      <div class="feature-chip"><div class="dot" style="background:var(--harvest)"></div><span>Feed & Pasture logs</span></div>
       <div class="feature-chip"><div class="dot" style="background:var(--river)"></div><span>Appwrite Sites</span></div>
       <div class="feature-chip"><div class="dot"></div><span>Android-first</span></div>
-      <!-- duplicate for seamless loop -->
       <div class="feature-chip"><div class="dot"></div><span>Offline-first SQLite</span></div>
       <div class="feature-chip"><div class="dot"></div><span>Transactional outbox sync</span></div>
       <div class="feature-chip"><div class="dot" style="background:var(--harvest)"></div><span>Conflict detection</span></div>
@@ -1575,13 +1563,12 @@
       <div class="feature-chip"><div class="dot" style="background:var(--harvest)"></div><span>PIN auth layer</span></div>
       <div class="feature-chip"><div class="dot" style="background:var(--river)"></div><span>Bidirectional sync</span></div>
       <div class="feature-chip"><div class="dot"></div><span>Appwrite Functions · Go</span></div>
-      <div class="feature-chip"><div class="dot" style="background:var(--harvest)"></div><span>Cloudflare Workers</span></div>
+      <div class="feature-chip"><div class="dot" style="background:var(--harvest)"></div><span>Feed & Pasture logs</span></div>
       <div class="feature-chip"><div class="dot" style="background:var(--river)"></div><span>Appwrite Sites</span></div>
       <div class="feature-chip"><div class="dot"></div><span>Android-first</span></div>
     </div>
   </div>
 
-  <!-- WHAT IT DOES -->
   <section style="background:var(--fog);">
     <div class="section-label">Platform Overview</div>
     <h2 class="section-title">Everything a farm operation needs</h2>
@@ -1596,6 +1583,16 @@
         <div class="feature-icon">🥛</div>
         <h3>Milk Logging</h3>
         <p>Session-by-session milk logs linked to individual animals. Live dashboard shows daily totals and trends.</p>
+      </div>
+      <div class="feature-card fade-up">
+        <div class="feature-icon">🌿</div>
+        <h3>Feed & Pasture</h3>
+        <p>Track paddock rotation to prevent overgrazing, alongside supplemental feed costs and water/mineral issues.</p>
+      </div>
+      <div class="feature-card fade-up">
+        <div class="feature-icon">📊</div>
+        <h3>Monthly KPIs</h3>
+        <p>Automated dashboards compute herd sizes, birth/death rates, and net profits natively via instant SQLite aggregates.</p>
       </div>
       <div class="feature-card fade-up">
         <div class="feature-icon">📦</div>
@@ -1620,7 +1617,6 @@
     </div>
   </section>
 
-  <!-- POWERED BY -->
   <section style="background:var(--soil);padding:3.5rem 5rem;">
     <div class="section-label" style="color:rgba(224,240,220,.4);">Built with</div>
     <h2 style="font-family:var(--font-display);font-size:1.6rem;color:var(--straw);margin-bottom:2rem;">The stack behind the app</h2>
@@ -1665,11 +1661,10 @@
       <a href="#" onclick="showPage('changelog')">Changelog</a>
       <a href="#" onclick="showPage('arch')">Architecture</a>
     </div>
-    <div class="footer-meta">Beta v0.2.1 · Flutter · Appwrite Cloud</div>
+    <div class="footer-meta">Beta v0.3.0 · Flutter · Appwrite Cloud</div>
   </footer>
 </div>
 
-<!-- ══════════════════════════ GETTING STARTED ══════════════════════════ -->
 <div id="page-start" class="page">
 <div class="docs-layout">
   <aside class="docs-sidebar">
@@ -1766,6 +1761,7 @@ Endpoint   : https://YOUR_APPWRITE_ENDPOINT/v1</code></pre>
         <tr><td>partial_payments</td><td>payment_id</td><td>Instalments on a financial record</td></tr>
         <tr><td>asset_events</td><td>event_id</td><td>Activity log per asset</td></tr>
         <tr><td>milk_logs</td><td>log_id</td><td>Milk sessions</td></tr>
+        <tr><td>flock_logs</td><td>log_id</td><td>Paddock rotation and supplemental feed tracking</td></tr>
         <tr><td>asset_images</td><td>image_id</td><td>Image metadata — stores file reference and thumbnail URL</td></tr>
         <tr><td>sync_conflicts</td><td>conflict_id</td><td>Conflict audit log</td></tr>
       </tbody>
@@ -1806,7 +1802,7 @@ Allowed    : image/jpeg</code></pre>
         <div class="step-body">
           <h4>Launch the app</h4>
           <pre><code>flutter run --debug</code></pre>
-          <p>On first launch the app creates the local SQLite schema (version 1 — fresh install only, no migrations in beta). You'll be prompted to set a PIN.</p>
+          <p>On first launch the app creates the local SQLite schema (version 2). You'll be prompted to set a PIN.</p>
         </div>
       </div>
       <div class="step">
@@ -1836,7 +1832,7 @@ flutter build appbundle --release</code></pre>
         <tr><td>bucketId</td><td>asset-images</td><td>ImageSyncService</td></tr>
         <tr><td>syncTickMs</td><td>1000000 (1000s)</td><td>AppRefreshService</td></tr>
         <tr><td>maxImageBytes</td><td>204800 (200KB)</td><td>flutter_image_compress</td></tr>
-        <tr><td>sqliteVersion</td><td>1</td><td>sqflite, fresh install</td></tr>
+        <tr><td>sqliteVersion</td><td>2</td><td>sqflite DB upgrade</td></tr>
       </tbody>
     </table></div>
 
@@ -1848,7 +1844,6 @@ flutter build appbundle --release</code></pre>
 </div>
 </div>
 
-<!-- ══════════════════════════ ARCHITECTURE ══════════════════════════ -->
 <div id="page-arch" class="page">
 <div class="arch-page">
   <div class="section-label">Technical Reference</div>
@@ -1872,7 +1867,7 @@ flutter build appbundle --release</code></pre>
     <div class="arch-card">
       <div class="arch-card-header"><span class="icon">⬇️</span><h3>DownSyncService</h3></div>
       <div class="arch-card-body">
-        <p>Cursor-based pull of all 9 collections from Appwrite. Uses <code>sync_meta</code> table to persist per-collection cursors so only new/updated documents are fetched.</p>
+        <p>Cursor-based pull of all 10 collections from Appwrite. Uses <code>sync_meta</code> table to persist per-collection cursors so only new/updated documents are fetched.</p>
         <ul>
           <li>Reads last cursor from <code>sync_meta</code></li>
           <li>Fetches pages sorted by <code>created_at ASC</code></li>
@@ -1919,12 +1914,12 @@ flutter build appbundle --release</code></pre>
     <div class="arch-card">
       <div class="arch-card-header"><span class="icon">🗄️</span><h3>Local SQLite Schema</h3></div>
       <div class="arch-card-body">
-        <p>Version 1 (beta — no migrations). All collections mirror the Appwrite schema plus local-only housekeeping tables.</p>
+        <p>Version 2 schema with migrations handled via <code>sqflite</code> onUpgrade routines.</p>
         <ul>
           <li><code>sync_queue</code> — outbox for up-sync</li>
           <li><code>sync_meta</code> — per-collection down-sync cursors</li>
           <li><code>auth_config</code> — hashed PIN store</li>
-          <li>All 9 collection tables (mirrored from Appwrite)</li>
+          <li>All 10 collection tables (mirrored from Appwrite)</li>
         </ul>
       </div>
     </div>
@@ -1999,6 +1994,7 @@ DownSyncService.pull()
       <tr><td>partial_payments</td><td>payment_id</td><td>Instalments referencing a <code>financials</code> record.</td></tr>
       <tr><td>asset_events</td><td>event_id</td><td>Per-asset activity log (vaccinations, treatments, etc.).</td></tr>
       <tr><td>milk_logs</td><td>log_id</td><td>Individual milk sessions linked to an asset.</td></tr>
+      <tr><td>flock_logs</td><td>log_id</td><td>Feed, pasture, and rotation tracking.</td></tr>
       <tr><td>asset_images</td><td>image_id</td><td>Image metadata. File lives in Storage bucket; this stores reference + thumbnail URL.</td></tr>
       <tr><td>sync_conflicts</td><td>conflict_id</td><td>Conflict audit. Written by DownSyncService when Appwrite version overwrites local.</td></tr>
     </tbody>
@@ -2087,25 +2083,52 @@ Daraja Callback → Cloudflare Worker → Appwrite Function (Go)
     <tbody>
       <tr><td>setState Future assertion</td><td><span style="color:var(--leaf);font-family:var(--font-mono);font-size:.8rem">FIXED v0.2.0</span></td><td>Block syntax applied across all affected screens</td></tr>
       <tr><td>M-Pesa manual entry</td><td><span style="color:var(--terracotta);font-family:var(--font-mono);font-size:.8rem">PLANNED</span></td><td>No-receipt M-Pesa payments not yet supported</td></tr>
-      <tr><td>SQLite migrations</td><td><span style="color:var(--harvest);font-family:var(--font-mono);font-size:.8rem">BETA ONLY</span></td><td>Schema v1 — beta assumes fresh install; migrations come post-beta</td></tr>
     </tbody>
   </table></div>
 </div>
 </div>
 
-<!-- ══════════════════════════ CHANGELOG ══════════════════════════ -->
 <div id="page-changelog" class="page">
 <div class="changelog-page">
   <div class="section-label">Release History</div>
   <h1>Changelog</h1>
   <p class="lead">All notable changes to Akavango Farm Manager are documented here. The project follows <a href="https://semver.org" style="color:var(--terracotta)">Semantic Versioning</a>. Dates are in ISO 8601 format.</p>
 
-  <!-- v0.2.1 -->
+  <div class="release">
+    <div class="release-meta">
+      <div class="release-version">v0.3.0</div>
+      <div class="release-date">2026 — Q2</div>
+      <span class="release-badge badge-latest">Latest · Beta</span>
+    </div>
+    <div class="release-body">
+      <h3>Pasture Logging & Monthly KPIs</h3>
+      <p style="font-size:.88rem;color:#2e4a32;margin-bottom:1.2rem;">A major feature update introducing flock-level feed tracking, automated dashboard analytics, and deep health/mortality metadata.</p>
+      
+      <div class="change-group">
+        <div class="change-group-label added">✦ Added</div>
+        <ul class="change-list">
+          <li><strong>Feed & Pasture Logs:</strong> New dedicated screen and <code>flock_logs</code> collection for tracking paddock rotation, supplemental feeding, and daily feed costs.</li>
+          <li><strong>Monthly Summary KPIs:</strong> The dashboard now aggregates flock size, monthly births, deaths, total income, and total expenses natively via SQLite.</li>
+          <li><strong>Extended Health Metadata:</strong> Medication and deworming events now capture Anthelmintic Class, Route, and auto-calculate Withdrawal End Dates.</li>
+          <li><strong>Advanced Mortality Logs:</strong> Deceased events now capture Probable Cause, Carcass Disposal Method, and Vet Consultation status.</li>
+          <li>New event types: <code>hoofTrim</code> 🪚 and <code>dipping</code> 🛁.</li>
+        </ul>
+      </div>
+
+      <div class="change-group">
+        <div class="change-group-label changed">↺ Changed</div>
+        <ul class="change-list">
+          <li>SQLite schema incremented to Version 2.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
   <div class="release">
     <div class="release-meta">
       <div class="release-version">v0.2.1</div>
       <div class="release-date">2026 — Q1</div>
-      <span class="release-badge badge-latest">Latest · Beta</span>
+      <span class="release-badge badge-beta">Beta</span>
     </div>
     <div class="release-body">
       <h3>Sync Orchestration — Internal Patch</h3>
@@ -2130,7 +2153,6 @@ Daraja Callback → Cloudflare Worker → Appwrite Function (Go)
     </div>
   </div>
 
-  <!-- v0.2.0 -->
   <div class="release">
     <div class="release-meta">
       <div class="release-version">v0.2.0</div>
@@ -2171,7 +2193,6 @@ Daraja Callback → Cloudflare Worker → Appwrite Function (Go)
     </div>
   </div>
 
-  <!-- v0.1.0 -->
   <div class="release">
     <div class="release-meta">
       <div class="release-version">v0.1.0</div>
@@ -2210,12 +2231,11 @@ Daraja Callback → Cloudflare Worker → Appwrite Function (Go)
     </div>
   </div>
 
-  <!-- v0.0.3 -->
   <div class="release">
     <div class="release-meta">
       <div class="release-version">v0.0.3</div>
       <div class="release-date">2026 — Q1</div>
-      <span class="release-badge badge-beta">Alpha</span>
+      <span class="release-badge badge-alpha">Alpha</span>
     </div>
     <div class="release-body">
       <h3>Sync Engine Stabilisation</h3>
@@ -2238,7 +2258,6 @@ Daraja Callback → Cloudflare Worker → Appwrite Function (Go)
     </div>
   </div>
 
-  <!-- v0.0.2 -->
   <div class="release">
     <div class="release-meta">
       <div class="release-version">v0.0.2</div>
@@ -2267,7 +2286,6 @@ Daraja Callback → Cloudflare Worker → Appwrite Function (Go)
     </div>
   </div>
 
-  <!-- v0.0.1 -->
   <div class="release">
     <div class="release-meta">
       <div class="release-version">v0.0.1</div>

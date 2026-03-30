@@ -19,7 +19,7 @@ class LocalDb {
     final path = join(dbPath, 'farm_app.db');
     return await openDatabase(
       path,
-      version: 1,
+      version: 2, // BUMPED TO VERSION 2 FOR FLOCK_LOGS
       onConfigure: _onConfigure,
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
@@ -167,6 +167,24 @@ class LocalDb {
       )
     ''');
 
+    // ── Phase 2: Feed & Pasture Management Logs ───────────────────────────────
+    await db.execute('''
+      CREATE TABLE flock_logs (
+        log_id                 TEXT PRIMARY KEY,
+        recorded_at            TEXT NOT NULL,
+        paddock_in_use         TEXT,
+        animals_on_pasture     INTEGER,
+        suppl_feed_type        TEXT,
+        qty_fed                REAL,
+        mineral_block_provided INTEGER NOT NULL DEFAULT 0,
+        water_issue            INTEGER NOT NULL DEFAULT 0,
+        feed_cost              REAL NOT NULL DEFAULT 0.0,
+        notes                  TEXT,
+        created_by             TEXT NOT NULL,
+        created_at             TEXT NOT NULL
+      )
+    ''');
+
     // ── Auth Config (local PIN only — never synced) ───────────────────────────
     await db.execute('''
       CREATE TABLE auth_config (
@@ -218,12 +236,35 @@ class LocalDb {
     await db.execute('CREATE INDEX idx_milk_asset      ON milk_logs(asset_id, recorded_at)');
     await db.execute('CREATE INDEX idx_milk_user       ON milk_logs(created_by)');
     await db.execute('CREATE INDEX idx_sync_status     ON sync_queue(status)');
+    await db.execute('CREATE INDEX idx_flock_date      ON flock_logs(recorded_at)');
+    await db.execute('CREATE INDEX idx_flock_user      ON flock_logs(created_by)');
+
     // ── v2: Images ──────────────────────────────────────────────────────────
     await _createImageTables(db);
   }
 
   Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
-    // Fresh install — no migrations needed at v1.
+    if (oldVersion < 2) {
+      // Phase 2: Add Flock Logs table if migrating from v1
+      await db.execute('''
+        CREATE TABLE flock_logs (
+          log_id                 TEXT PRIMARY KEY,
+          recorded_at            TEXT NOT NULL,
+          paddock_in_use         TEXT,
+          animals_on_pasture     INTEGER,
+          suppl_feed_type        TEXT,
+          qty_fed                REAL,
+          mineral_block_provided INTEGER NOT NULL DEFAULT 0,
+          water_issue            INTEGER NOT NULL DEFAULT 0,
+          feed_cost              REAL NOT NULL DEFAULT 0.0,
+          notes                  TEXT,
+          created_by             TEXT NOT NULL,
+          created_at             TEXT NOT NULL
+        )
+      ''');
+      await db.execute('CREATE INDEX idx_flock_date ON flock_logs(recorded_at)');
+      await db.execute('CREATE INDEX idx_flock_user ON flock_logs(created_by)');
+    }
   }
 
   Future<void> _createImageTables(Database db) async {
@@ -356,7 +397,7 @@ class LocalDb {
     );
   }
 
-  /// Calculate total sales for the current user (Perfect for the Dashboard)
+  /// Calculate total sales for the current user
   Future<double> getMyTotalSales() async {
     final db = await database;
     final userId = SessionManager.instance.currentUserId;
@@ -425,5 +466,4 @@ class LocalDb {
       conflictAlgorithm: ConflictAlgorithm.replace,
     );
   }
-
 }

@@ -1,0 +1,252 @@
+package handler
+
+import (
+	"encoding/json"
+	"fmt"
+	"os"
+	"time"
+
+	"github.com/appwrite/sdk-for-go/appwrite"
+	"github.com/appwrite/sdk-for-go/models"
+	"github.com/appwrite/sdk-for-go/query"
+	"github.com/appwrite/sdk-for-go/tablesdb"
+	"github.com/open-runtimes/types-for-go/v4/openruntimes"
+)
+
+// ─────────────────────────────────────────────────────────────────────────────
+// MAIN ROUTER
+// ─────────────────────────────────────────────────────────────────────────────
+
+func Main(Context openruntimes.Context) openruntimes.Response {
+	path := Context.Req.Path
+	method := Context.Req.Method
+
+	Context.Log(fmt.Sprintf("[core-api] %s %s", method, path))
+
+	// Public route
+	if path == "/health" && method == "GET" {
+		return handleHealth(Context)
+	}
+
+	// Protected routes
+	if !isAuthorized(Context) {
+		return jsonErr(Context, 401, "unauthorised")
+	}
+
+	switch {
+	case path == "/heartbeat/log" && method == "POST":
+		return handleHeartbeatLog(Context)
+	case path == "/heartbeat/cleanup" && method == "POST":
+		return handleHeartbeatCleanup(Context)
+	case path == "/heartbeat/list" && method == "GET":
+		return handleHeartbeatList(Context)
+	default:
+		return jsonErr(Context, 404, "route not found")
+	}
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// AUTH
+// ─────────────────────────────────────────────────────────────────────────────
+
+func isAuthorized(Context openruntimes.Context) bool {
+	expected := os.Getenv("APPWRITE_API_KEY")
+	if expected == "" {
+		return false
+	}
+	got := Context.Req.Headers["x-appwrite-key"]
+	return got == expected
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// RESPONSE HELPERS
+// ─────────────────────────────────────────────────────────────────────────────
+
+func jsonOK(Context openruntimes.Context, data map[string]interface{}) openruntimes.Response {
+	return jsonResp(Context, 200, data)
+}
+
+func jsonErr(Context openruntimes.Context, status int, msg string) openruntimes.Response {
+	return jsonResp(Context, status, map[string]interface{}{"error": msg})
+}
+
+func jsonResp(Context openruntimes.Context, status int, data map[string]interface{}) openruntimes.Response {
+	body, _ := json.Marshal(data)
+	res := Context.Res.Json(body)
+	res.StatusCode = status
+	return res
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// DB CLIENT
+// ─────────────────────────────────────────────────────────────────────────────
+
+func newDB() (*tablesdb.TablesDB, string, string) {
+	client := appwrite.NewClient(
+		appwrite.WithEndpoint(os.Getenv("APPWRITE_FUNCTION_API_ENDPOINT")),
+		appwrite.WithProject(os.Getenv("APPWRITE_FUNCTION_PROJECT_ID")),
+		appwrite.WithKey(os.Getenv("APPWRITE_API_KEY")),
+	)
+	db := tablesdb.New(client)
+
+	return db,
+		os.Getenv("APPWRITE_DB_ID"),
+		os.Getenv("APPWRITE_TABLE_HEARTBEAT")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// HEALTH CHECK (PUBLIC)
+// ─────────────────────────────────────────────────────────────────────────────
+
+func handleHealth(Context openruntimes.Context) openruntimes.Response {
+	start := time.Now()
+
+	db, dbID, tableID := newDB()
+
+	status := "ok"
+	errMsg := ""
+
+	// Minimal DB check
+	_, err := db.ListRows(dbID, tableID,
+		db.WithListRowsQueries([]string{query.Limit(1)}),
+	)
+
+	if err != nil {
+		status = "degraded"
+		errMsg = err.Error()
+	}
+
+	latency := time.Since(start).Milliseconds()
+
+	// Log heartbeat (non-blocking)
+	_, _ = db.CreateRow(dbID, tableID, "unique()",
+		map[string]interface{}{
+			"status":         status,
+			"latency":        latency,
+			"error":          errMsg,
+			"request_source": "health",
+			"request_type":   "health",
+			"timestamp":      time.Now().UTC().Format(time.RFC3339),
+		},
+	)
+
+	return jsonOK(Context, map[string]interface{}{
+		"status":  status,
+		"latency": latency,
+		"time":    time.Now().UTC(),
+	})
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// HEARTBEAT LOG (PROTECTED)
+// ─────────────────────────────────────────────────────────────────────────────
+
+type heartbeatLogRequest struct {
+	Status  string `json:"status"`
+	Source  string `json:"source"`
+	Type    string `json:"type"`
+	Error   string `json:"error"`
+	Latency int64  `json:"latency"`
+}
+
+func handleHeartbeatLog(Context openruntimes.Context) openruntimes.Response {
+	var req heartbeatLogRequest
+	_ = json.Unmarshal([]byte(Context.Req.BodyRaw()), &req)
+
+	db, dbID, tableID := newDB()
+
+	if req.Status == "" {
+		req.Status = "ok"
+	}
+	if req.Source == "" {
+		req.Source = "worker"
+	}
+	if req.Type == "" {
+		req.Type = "synthetic"
+	}
+
+	_, err := db.CreateRow(dbID, tableID, "unique()",
+		map[string]interface{}{
+			"status":         req.Status,
+			"latency":        req.Latency,
+			"error":          req.Error,
+			"request_source": req.Source,
+			"request_type":   req.Type,
+			"timestamp":      time.Now().UTC().Format(time.RFC3339),
+		},
+	)
+
+	if err != nil {
+		return jsonErr(Context, 500, "failed to log heartbeat")
+	}
+
+	return jsonOK(Context, map[string]interface{}{"logged": true})
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// HEARTBEAT CLEANUP
+// ─────────────────────────────────────────────────────────────────────────────
+
+func handleHeartbeatCleanup(Context openruntimes.Context) openruntimes.Response {
+	db, dbID, tableID := newDB()
+
+	resp, err := db.ListRows(dbID, tableID,
+		db.WithListRowsQueries([]string{
+			query.OrderDesc("$createdAt"),
+			query.Limit(200),
+		}),
+	)
+
+	if err != nil {
+		return jsonErr(Context, 500, "failed to fetch logs")
+	}
+
+	var logs models.RowList
+	_ = resp.Decode(&logs)
+
+	if len(logs.Rows) <= 100 {
+		return jsonOK(Context, map[string]interface{}{
+			"message": "no cleanup needed",
+			"count":   len(logs.Rows),
+		})
+	}
+
+	deleted := 0
+	for i := 100; i < len(logs.Rows); i++ {
+		_, err := db.DeleteRow(dbID, tableID, logs.Rows[i].Id)
+		if err == nil {
+			deleted++
+		}
+	}
+
+	return jsonOK(Context, map[string]interface{}{
+		"deleted": deleted,
+		"kept":    100,
+	})
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// HEARTBEAT LIST (FOR DASHBOARD)
+// ─────────────────────────────────────────────────────────────────────────────
+
+func handleHeartbeatList(Context openruntimes.Context) openruntimes.Response {
+	db, dbID, tableID := newDB()
+
+	resp, err := db.ListRows(dbID, tableID,
+		db.WithListRowsQueries([]string{
+			query.OrderDesc("$createdAt"),
+			query.Limit(50),
+		}),
+	)
+
+	if err != nil {
+		return jsonErr(Context, 500, "failed to fetch logs")
+	}
+
+	var logs models.RowList
+	_ = resp.Decode(&logs)
+
+	return jsonOK(Context, map[string]interface{}{
+		"rows": logs.Rows,
+	})
+}

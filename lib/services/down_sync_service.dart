@@ -67,6 +67,11 @@ class DownSyncService {
       table:      'asset_images',
       primaryKey: 'image_id',
     ),
+    _CollectionConfig(
+      collection: AppwriteClient.colFlockLogs,
+      table:      'flock_logs',
+      primaryKey: 'log_id',
+    ),
   ];
 
   // ── Public API ──────────────────────────────────────────────────────────────

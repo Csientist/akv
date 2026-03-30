@@ -654,6 +654,16 @@ class _LogEventSheetState extends State<_LogEventSheet> {
   final _meta1Ctrl      = TextEditingController();
   final _meta2Ctrl      = TextEditingController();
   final _otherLabelCtrl = TextEditingController(); // free-text for 'other' type
+  
+  // Phase 1: New Controllers for Metadata Extensions
+  final _withdrawalDaysCtrl = TextEditingController();
+  final _anthelminticClassCtrl = TextEditingController();
+  final _routeCtrl = TextEditingController();
+  final _nextDueCtrl = TextEditingController();
+  final _probableCauseCtrl = TextEditingController();
+  final _carcassDisposalCtrl = TextEditingController();
+  bool _vetCalled = false;
+  
   final userId = SessionManager.instance.currentUserId;
 
   DateTime  _recordedAt = DateTime.now();
@@ -672,11 +682,13 @@ class _LogEventSheetState extends State<_LogEventSheet> {
   };
   bool get _supportsRange => _rangeTypes.contains(_selectedType);
 
-  // Event types — vaccination removed (covered by medication)
+  // Phase 1: Added Hoof Trim and Dipping
   static const _livestockTypes = [
     ('deworming',      '💊', 'Deworming'),
     ('vetVisit',       '🏥', 'Vet Visit'),
     ('medication',     '💊', 'Medication'),
+    ('hoofTrim',       '🪚', 'Hoof Trim'),
+    ('dipping',        '🛁', 'Dipping'),
     ('injury',         '🩹', 'Injury'),
     ('dryingOff',      '🧴', 'Drying Off'),
     ('isolation',      '🚧', 'Isolation'),
@@ -738,6 +750,10 @@ class _LogEventSheetState extends State<_LogEventSheet> {
         case 'isolation':
           _meta1Ctrl.text = m['drug']?.toString() ?? '';
           _meta2Ctrl.text = m['dose']?.toString() ?? '';
+          _withdrawalDaysCtrl.text = m['withdrawal_days']?.toString() ?? '';
+          _anthelminticClassCtrl.text = m['anthelmintic_class']?.toString() ?? '';
+          _routeCtrl.text = m['route']?.toString() ?? '';
+          _nextDueCtrl.text = m['next_due_date']?.toString() ?? '';
         case 'mating':
           _meta1Ctrl.text = m['sire']?.toString() ?? '';
         case 'birth':
@@ -755,6 +771,11 @@ class _LogEventSheetState extends State<_LogEventSheet> {
         case 'sold':
           _meta1Ctrl.text = m['buyer']?.toString() ?? '';
           _meta2Ctrl.text = m['amount_kes']?.toString() ?? '';
+        case 'deceased':
+        case 'injury':
+          _probableCauseCtrl.text = m['probable_cause']?.toString() ?? '';
+          _carcassDisposalCtrl.text = m['carcass_disposal']?.toString() ?? '';
+          _vetCalled = m['vet_called'] == true;
         case 'other':
           _otherLabelCtrl.text = m['activity']?.toString() ?? '';
       }
@@ -771,6 +792,12 @@ class _LogEventSheetState extends State<_LogEventSheet> {
     _meta1Ctrl.dispose();
     _meta2Ctrl.dispose();
     _otherLabelCtrl.dispose();
+    _withdrawalDaysCtrl.dispose();
+    _anthelminticClassCtrl.dispose();
+    _routeCtrl.dispose();
+    _nextDueCtrl.dispose();
+    _probableCauseCtrl.dispose();
+    _carcassDisposalCtrl.dispose();
     super.dispose();
   }
 
@@ -811,6 +838,18 @@ class _LogEventSheetState extends State<_LogEventSheet> {
           _MetaField(ctrl: _meta1Ctrl, label: 'Drug / Product name', hint: 'e.g. Ivermectin'),
           const SizedBox(height: 12),
           _MetaField(ctrl: _meta2Ctrl, label: 'Dose / Quantity', hint: 'e.g. 5ml'),
+          if (_selectedType == 'deworming' || _selectedType == 'medication') ...[
+            const SizedBox(height: 12),
+            _MetaField(ctrl: _anthelminticClassCtrl, label: 'Anthelmintic Class', hint: 'e.g. BZ, LEV, ML'),
+            const SizedBox(height: 12),
+            _MetaField(ctrl: _routeCtrl, label: 'Route', hint: 'e.g. Oral, Injectable'),
+            const SizedBox(height: 12),
+            Row(children: [
+              Expanded(child: _MetaField(ctrl: _withdrawalDaysCtrl, label: 'Withdrawal (Days)', hint: 'e.g. 14', keyboard: TextInputType.number)),
+              const SizedBox(width: 12),
+              Expanded(child: _MetaField(ctrl: _nextDueCtrl, label: 'Next Due (YYYY-MM-DD)', hint: 'Optional')),
+            ]),
+          ]
         ]);
       case 'mating':
         return _MetaField(ctrl: _meta1Ctrl, label: 'Sire / Bull ID or Name', hint: 'e.g. Bull-007');
@@ -841,6 +880,21 @@ class _LogEventSheetState extends State<_LogEventSheet> {
           const SizedBox(height: 12),
           _MetaField(ctrl: _meta2Ctrl, label: 'Sale amount (KES)', hint: 'e.g. 85000', keyboard: TextInputType.number),
         ]);
+      case 'deceased':
+      case 'injury':
+        return Column(children: [
+          _MetaField(ctrl: _probableCauseCtrl, label: 'Probable Cause / Diagnosis', hint: 'e.g. Pneumonia, Predator'),
+          const SizedBox(height: 12),
+          _MetaField(ctrl: _carcassDisposalCtrl, label: 'Carcass Disposal Method', hint: 'e.g. Buried, Burned'),
+          const SizedBox(height: 12),
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            title: const Text('Vet Called?', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF52796F))),
+            value: _vetCalled,
+            activeThumbColor: const Color(0xFF2D6A4F),
+            onChanged: (v) => setState(() => _vetCalled = v),
+          ),
+        ]);
       case 'other':
         return _MetaField(ctrl: _otherLabelCtrl, label: 'Activity description', hint: 'e.g. Hand milking, Shearing');
       default:
@@ -865,6 +919,18 @@ class _LogEventSheetState extends State<_LogEventSheet> {
       case 'isolation':
         if (_meta1Ctrl.text.isNotEmpty) m['drug'] = _meta1Ctrl.text.trim();
         if (_meta2Ctrl.text.isNotEmpty) m['dose'] = _meta2Ctrl.text.trim();
+        if (_selectedType == 'deworming' || _selectedType == 'medication') {
+          if (_withdrawalDaysCtrl.text.isNotEmpty) {
+            final days = int.tryParse(_withdrawalDaysCtrl.text);
+            m['withdrawal_days'] = days;
+            if (days != null) {
+              m['withdrawal_end_date'] = _recordedAt.add(Duration(days: days)).toIso8601String().substring(0, 10);
+            }
+          }
+          if (_anthelminticClassCtrl.text.isNotEmpty) m['anthelmintic_class'] = _anthelminticClassCtrl.text.trim();
+          if (_routeCtrl.text.isNotEmpty) m['route'] = _routeCtrl.text.trim();
+          if (_nextDueCtrl.text.isNotEmpty) m['next_due_date'] = _nextDueCtrl.text.trim();
+        }
       case 'mating':
         if (_meta1Ctrl.text.isNotEmpty) m['sire'] = _meta1Ctrl.text.trim();
       case 'birth':
@@ -882,6 +948,11 @@ class _LogEventSheetState extends State<_LogEventSheet> {
       case 'sold':
         if (_meta1Ctrl.text.isNotEmpty) m['buyer'] = _meta1Ctrl.text.trim();
         if (_meta2Ctrl.text.isNotEmpty) m['amount_kes'] = double.tryParse(_meta2Ctrl.text);
+      case 'deceased':
+      case 'injury':
+        if (_probableCauseCtrl.text.isNotEmpty) m['probable_cause'] = _probableCauseCtrl.text.trim();
+        if (_carcassDisposalCtrl.text.isNotEmpty) m['carcass_disposal'] = _carcassDisposalCtrl.text.trim();
+        m['vet_called'] = _vetCalled;
       case 'other':
         if (_otherLabelCtrl.text.isNotEmpty) m['activity'] = _otherLabelCtrl.text.trim();
     }
