@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/appwrite/sdk-for-go/appwrite"
@@ -18,6 +19,42 @@ import (
 // ─────────────────────────────────────────────────────────────────────────────
 
 func Main(Context openruntimes.Context) openruntimes.Response {
+
+	// ── PROXY ADAPTER LAYER (HARDENED) ─────────────────────────
+
+	var wrapper struct {
+		Path    string            `json:"path"`
+		Method  string            `json:"method"`
+		Headers map[string]string `json:"headers"`
+		Body    string            `json:"body"`
+	}
+
+	if err := json.Unmarshal([]byte(Context.Req.BodyRaw()), &wrapper); err == nil {
+
+		// Validate minimal structure
+		if wrapper.Path != "" &&
+			wrapper.Method != "" &&
+			strings.HasPrefix(wrapper.Path, "/") {
+
+			Context.Log("[adapter] proxy request detected")
+
+			// Normalize method
+			Context.Req.Method = strings.ToUpper(wrapper.Method)
+
+			// Apply safe path
+			Context.Req.Path = wrapper.Path
+
+			// Merge headers safely (preserve existing ones)
+			if wrapper.Headers != nil {
+				for k, v := range wrapper.Headers {
+					if v != "" {
+						Context.Req.Headers[strings.ToLower(k)] = v
+					}
+				}
+			}
+		}
+	}
+
 	path := Context.Req.Path
 	method := Context.Req.Method
 
@@ -50,12 +87,17 @@ func Main(Context openruntimes.Context) openruntimes.Response {
 // ─────────────────────────────────────────────────────────────────────────────
 
 func isAuthorized(Context openruntimes.Context) bool {
-	expected := os.Getenv("APPWRITE_API_KEY")
+	expected := os.Getenv("FUNCTION_INTERNAL_KEY")
 	if expected == "" {
+		Context.Log("[auth] APPWRITE_API_KEY env var is not set")
 		return false
 	}
 	got := Context.Req.Headers["x-appwrite-key"]
-	return got == expected
+	if got != expected {
+		Context.Log("[auth] invalid or missing x-appwrite-key header")
+		return false
+	}
+	return true
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -151,8 +193,7 @@ type heartbeatLogRequest struct {
 
 func handleHeartbeatLog(Context openruntimes.Context) openruntimes.Response {
 	var req heartbeatLogRequest
-	_ = json.Unmarshal([]byte(Context.Req.BodyRaw()), &req)
-
+	_ = json.Unmarshal([]byte(resolveBody(Context)), &req)
 	db, dbID, tableID := newDB()
 
 	if req.Status == "" {
@@ -249,4 +290,16 @@ func handleHeartbeatList(Context openruntimes.Context) openruntimes.Response {
 	return jsonOK(Context, map[string]interface{}{
 		"rows": logs.Rows,
 	})
+}
+
+// resolveBody returns the effective request body, preferring the
+// proxy-wrapper body when the request was forwarded via the adapter.
+func resolveBody(Context openruntimes.Context) string {
+	var wrapper struct {
+		Body string `json:"body"`
+	}
+	if err := json.Unmarshal([]byte(Context.Req.BodyRaw()), &wrapper); err == nil && wrapper.Body != "" {
+		return wrapper.Body
+	}
+	return Context.Req.BodyRaw()
 }
