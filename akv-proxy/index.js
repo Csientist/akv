@@ -81,16 +81,22 @@ async function routeToFunction(request, env, functionId, prefix) {
 // ─────────────────────────────────────────────
 // RESPONSE UNWRAP
 // ─────────────────────────────────────────────
-
 function unwrapExecutionResponse(result) {
   try {
+    // Attempt to parse the body
     const body = JSON.parse(result.responseBody);
-
+    
     return new Response(JSON.stringify(body), {
       status: result.responseStatusCode || 200,
       headers: { "Content-Type": "application/json" },
     });
-  } catch {
+  } catch (parseError) {
+    // 🔴 NEW: Log the exact error and the raw body that caused it
+    console.error("JSON Parse Failed!");
+    console.error("Error:", parseError.message);
+    console.error("Raw Appwrite ResponseBody:", result.responseBody);
+    console.error("Appwrite Response Status:", result.responseStatusCode);
+
     return new Response(result.responseBody || "Invalid response", {
       status: result.responseStatusCode || 500,
     });
