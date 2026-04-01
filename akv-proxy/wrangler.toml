@@ -1,18 +1,27 @@
 name = "akavango-proxy"
 main = "index.js"
-compatibility_date = "2024-03-06"
+compatibility_date = "2026-03-31"
 
-# ── ROUTING ──
-[[routes]]
-pattern = "33373984.xyz/*"
-zone_name = "33373984.xyz"
+# Use routes array with custom_domain = true
+routes = [
+  { pattern = "akavango.33373984.xyz", custom_domain = true },
+  { pattern = "api.33373984.xyz", custom_domain = true }
+]
 
-
-# ── OBSERVABILITY ──
+# =========================
+# Observability (safe dev + prod debugging)
+# =========================
 [observability]
 enabled = false
+head_sampling_rate = 1
 
 [observability.logs]
 enabled = true
+head_sampling_rate = 1
 persist = true
 invocation_logs = true
+
+[observability.traces]
+enabled = false
+persist = true
+head_sampling_rate = 1
