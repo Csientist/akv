@@ -14,14 +14,9 @@ import (
 	"github.com/open-runtimes/types-for-go/v4/openruntimes"
 )
 
-// ─────────────────────────────────────────────────────────────────────────────
-// MAIN ROUTER
-// ─────────────────────────────────────────────────────────────────────────────
-
 func Main(Context openruntimes.Context) openruntimes.Response {
 
 	// ── PROXY ADAPTER LAYER (HARDENED) ─────────────────────────
-
 	var wrapper struct {
 		Path    string            `json:"path"`
 		Method  string            `json:"method"`
@@ -29,27 +24,25 @@ func Main(Context openruntimes.Context) openruntimes.Response {
 		Body    string            `json:"body"`
 	}
 
-	if err := json.Unmarshal([]byte(Context.Req.BodyRaw()), &wrapper); err == nil {
+	// 1. Call the method with parentheses to get the actual string
+	rawBody := Context.Req.BodyRaw()
 
-		// Validate minimal structure
-		if wrapper.Path != "" &&
-			wrapper.Method != "" &&
-			strings.HasPrefix(wrapper.Path, "/") {
+	// 2. Now convert the returned string to a byte array
+	if err := json.Unmarshal([]byte(rawBody), &wrapper); err != nil {
+		Context.Log(fmt.Sprintf("[adapter-error] failed to parse proxy payload: %v", err))
+		Context.Log(fmt.Sprintf("[adapter-error] raw payload: %s", rawBody))
+		return jsonErr(Context, 400, "invalid proxy payload format")
+	}
 
-			Context.Log("[adapter] proxy request detected")
+	// 3. Apply the proxy wrapper data
+	if wrapper.Path != "" && wrapper.Method != "" {
+		Context.Req.Method = strings.ToUpper(wrapper.Method)
+		Context.Req.Path = wrapper.Path
 
-			// Normalize method
-			Context.Req.Method = strings.ToUpper(wrapper.Method)
-
-			// Apply safe path
-			Context.Req.Path = wrapper.Path
-
-			// Merge headers safely (preserve existing ones)
-			if wrapper.Headers != nil {
-				for k, v := range wrapper.Headers {
-					if v != "" {
-						Context.Req.Headers[strings.ToLower(k)] = v
-					}
+		if wrapper.Headers != nil {
+			for k, v := range wrapper.Headers {
+				if v != "" {
+					Context.Req.Headers[strings.ToLower(k)] = v
 				}
 			}
 		}
@@ -67,16 +60,13 @@ func Main(Context openruntimes.Context) openruntimes.Response {
 
 	// Protected routes
 	if !isAuthorized(Context) {
-		return jsonErr(Context, 401, "unauthorised")
+		return jsonErr(Context, 401, "unauthorized")
 	}
 
 	switch {
 	case path == "/heartbeat/log" && method == "POST":
 		return handleHeartbeatLog(Context)
-	case path == "/heartbeat/cleanup" && method == "POST":
-		return handleHeartbeatCleanup(Context)
-	case path == "/heartbeat/list" && method == "GET":
-		return handleHeartbeatList(Context)
+	// ... rest of your routing
 	default:
 		return jsonErr(Context, 404, "route not found")
 	}
@@ -89,14 +79,17 @@ func Main(Context openruntimes.Context) openruntimes.Response {
 func isAuthorized(Context openruntimes.Context) bool {
 	expected := os.Getenv("FUNCTION_INTERNAL_KEY")
 	if expected == "" {
-		Context.Log("[auth] APPWRITE_API_KEY env var is not set")
+		Context.Log("[auth] FUNCTION_INTERNAL_KEY env var is not set in Appwrite")
 		return false
 	}
-	got := Context.Req.Headers["x-appwrite-key"]
+
+	// Look for the custom proxy secret injected by the Cloudflare Worker
+	got := Context.Req.Headers["x-proxy-secret"]
 	if got != expected {
-		Context.Log("[auth] invalid or missing x-appwrite-key header")
+		Context.Log("[auth] invalid or missing x-proxy-secret header")
 		return false
 	}
+
 	return true
 }
 

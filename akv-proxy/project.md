@@ -39,6 +39,7 @@ npx wrangler secret put INTEGRATION_FUNCTION_ID
 npx wrangler secret put PUBLIC_BASE_URL
 npx wrangler secret put CORE_DOMAIN
 npx wrangler secret put INTEGRATION_DOMAIN
+npx wrangler secret put FUNCTION_INTERNAL_KEY
 ```
 
 | Key | Description |
@@ -46,6 +47,7 @@ npx wrangler secret put INTEGRATION_DOMAIN
 | **APPWRITE_ENDPOINT** | e.g., `https://fra.cloud.appwrite.io/v1` |
 | **APPWRITE_PROJECT_ID** | Your Appwrite project ID |
 | **APPWRITE_API_KEY** | Scoped API key |
+| **FUNCTION_INTERNAL_KEY** | API Secret key |
 | **CORE_FUNCTION_ID** | Core API function ID |
 | **INTEGRATION_FUNCTION_ID** | Integration function ID |
 | **PUBLIC_BASE_URL** | Your fallback/dev domain (e.g., `https://akavango-proxy.workers.dev`) |

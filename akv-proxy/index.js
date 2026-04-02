@@ -5,6 +5,17 @@ export default {
     const hostname = url.hostname;
 
     try {
+      // 0. Intercept standard bot/browser paths
+      if (path === "/robots.txt") {
+        return new Response("User-agent: *\nDisallow: /", { 
+          status: 200, 
+          headers: { "Content-Type": "text/plain" } 
+        });
+      }
+
+      if (path === "/" || path === "/favicon.ico") {
+        return new Response("Not Found", { status: 404 });
+      }
       // 1. Internal/Utility Routes
       if (path.startsWith("/sim/")) {
         // CRITICAL FIX: ctx.waitUntil keeps the worker alive after responding
@@ -53,11 +64,14 @@ async function routeToFunction(request, env, functionId, prefix) {
   const internalPath = prefix ? url.pathname.replace(prefix, "") : url.pathname;
 
   const payload = {
-    path: internalPath,
-    method: request.method,
-    headers: Object.fromEntries(request.headers),
-    body: await safeBody(request),
-  };
+  path: internalPath,
+  method: request.method,
+  headers: {
+    ...Object.fromEntries(request.headers),
+    "x-proxy-secret": env.FUNCTION_INTERNAL_KEY // Inject your secret here
+  },
+  body: await safeBody(request),
+};
 
   const endpoint = `${env.APPWRITE_ENDPOINT}/functions/${functionId}/executions`;
 
@@ -82,16 +96,23 @@ async function routeToFunction(request, env, functionId, prefix) {
 // RESPONSE UNWRAP
 // ─────────────────────────────────────────────
 function unwrapExecutionResponse(result) {
-  try {
-    // Attempt to parse the body
-    const body = JSON.parse(result.responseBody);
+  // 🔴 NEW: Catch Appwrite API errors before parsing
+  if (result.responseBody === undefined) {
+    console.error("Appwrite API Call Failed!");
+    console.error("Full Appwrite Payload:", JSON.stringify(result, null, 2));
     
+    return new Response(`Appwrite Gateway Error: ${result.message || "Unknown"}`, { 
+      status: result.code || 502 
+    });
+  }
+
+  try {
+    const body = JSON.parse(result.responseBody);
     return new Response(JSON.stringify(body), {
       status: result.responseStatusCode || 200,
       headers: { "Content-Type": "application/json" },
     });
   } catch (parseError) {
-    // 🔴 NEW: Log the exact error and the raw body that caused it
     console.error("JSON Parse Failed!");
     console.error("Error:", parseError.message);
     console.error("Raw Appwrite ResponseBody:", result.responseBody);
