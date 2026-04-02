@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"strings"
 	"time"
 
 	"github.com/appwrite/sdk-for-go/appwrite"
@@ -16,38 +15,8 @@ import (
 
 func Main(Context openruntimes.Context) openruntimes.Response {
 
-	// ── PROXY ADAPTER LAYER (HARDENED) ─────────────────────────
-	var wrapper struct {
-		Path    string            `json:"path"`
-		Method  string            `json:"method"`
-		Headers map[string]string `json:"headers"`
-		Body    string            `json:"body"`
-	}
-
-	// 1. Call the method with parentheses to get the actual string
-	rawBody := Context.Req.BodyRaw()
-
-	// 2. Now convert the returned string to a byte array
-	if err := json.Unmarshal([]byte(rawBody), &wrapper); err != nil {
-		Context.Log(fmt.Sprintf("[adapter-error] failed to parse proxy payload: %v", err))
-		Context.Log(fmt.Sprintf("[adapter-error] raw payload: %s", rawBody))
-		return jsonErr(Context, 400, "invalid proxy payload format")
-	}
-
-	// 3. Apply the proxy wrapper data
-	if wrapper.Path != "" && wrapper.Method != "" {
-		Context.Req.Method = strings.ToUpper(wrapper.Method)
-		Context.Req.Path = wrapper.Path
-
-		if wrapper.Headers != nil {
-			for k, v := range wrapper.Headers {
-				if v != "" {
-					Context.Req.Headers[strings.ToLower(k)] = v
-				}
-			}
-		}
-	}
-
+	// ── NATIVE APPWRITE ROUTING ─────────────────────────
+	// Appwrite populates these natively from the Execution API
 	path := Context.Req.Path
 	method := Context.Req.Method
 
@@ -66,7 +35,10 @@ func Main(Context openruntimes.Context) openruntimes.Response {
 	switch {
 	case path == "/heartbeat/log" && method == "POST":
 		return handleHeartbeatLog(Context)
-	// ... rest of your routing
+	case path == "/heartbeat/cleanup" && method == "POST":
+		return handleHeartbeatCleanup(Context)
+	case path == "/heartbeat/list" && method == "GET":
+		return handleHeartbeatList(Context)
 	default:
 		return jsonErr(Context, 404, "route not found")
 	}
@@ -186,7 +158,9 @@ type heartbeatLogRequest struct {
 
 func handleHeartbeatLog(Context openruntimes.Context) openruntimes.Response {
 	var req heartbeatLogRequest
-	_ = json.Unmarshal([]byte(resolveBody(Context)), &req)
+
+	// Read directly from BodyRaw() now!
+	_ = json.Unmarshal([]byte(Context.Req.BodyRaw()), &req)
 	db, dbID, tableID := newDB()
 
 	if req.Status == "" {
@@ -283,16 +257,4 @@ func handleHeartbeatList(Context openruntimes.Context) openruntimes.Response {
 	return jsonOK(Context, map[string]interface{}{
 		"rows": logs.Rows,
 	})
-}
-
-// resolveBody returns the effective request body, preferring the
-// proxy-wrapper body when the request was forwarded via the adapter.
-func resolveBody(Context openruntimes.Context) string {
-	var wrapper struct {
-		Body string `json:"body"`
-	}
-	if err := json.Unmarshal([]byte(Context.Req.BodyRaw()), &wrapper); err == nil && wrapper.Body != "" {
-		return wrapper.Body
-	}
-	return Context.Req.BodyRaw()
 }

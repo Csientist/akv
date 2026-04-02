@@ -63,15 +63,16 @@ async function routeToFunction(request, env, functionId, prefix) {
   // If prefix is "/api", it gets stripped out.
   const internalPath = prefix ? url.pathname.replace(prefix, "") : url.pathname;
 
-  const payload = {
-  path: internalPath,
-  method: request.method,
-  headers: {
-    ...Object.fromEntries(request.headers),
-    "x-proxy-secret": env.FUNCTION_INTERNAL_KEY // Inject your secret here
-  },
-  body: await safeBody(request),
-};
+const appwritePayload = {
+    async: false,
+    path: internalPath,
+    method: request.method,
+    headers: {
+      ...Object.fromEntries(request.headers),
+      "x-proxy-secret": env.FUNCTION_INTERNAL_KEY
+    },
+    data: await safeBody(request), // 🔴 CRITICAL: This must be 'data', not 'body'
+  };
 
   const endpoint = `${env.APPWRITE_ENDPOINT}/functions/${functionId}/executions`;
 
@@ -82,10 +83,7 @@ async function routeToFunction(request, env, functionId, prefix) {
       "X-Appwrite-Project": env.APPWRITE_PROJECT_ID,
       "X-Appwrite-Key": env.APPWRITE_API_KEY,
     },
-    body: JSON.stringify({
-      async: false,
-      data: JSON.stringify(payload),
-    }),
+    body: JSON.stringify(appwritePayload), 
   });
 
   const result = await res.json();
