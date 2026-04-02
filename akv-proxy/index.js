@@ -94,18 +94,20 @@ const appwritePayload = {
 // RESPONSE UNWRAP
 // ─────────────────────────────────────────────
 function unwrapExecutionResponse(result) {
-  // 🔴 NEW: Catch Appwrite API errors before parsing
   if (result.responseBody === undefined) {
     console.error("Appwrite API Call Failed!");
-    console.error("Full Appwrite Payload:", JSON.stringify(result, null, 2));
-    
     return new Response(`Appwrite Gateway Error: ${result.message || "Unknown"}`, { 
       status: result.code || 502 
     });
   }
 
   try {
-    const body = JSON.parse(result.responseBody);
+    // 🔴 THE FIX: Decode Appwrite's Base64 payload back into a normal string
+    const decodedString = atob(result.responseBody);
+    
+    // Now safely parse the decoded string into a JSON object
+    const body = JSON.parse(decodedString);
+    
     return new Response(JSON.stringify(body), {
       status: result.responseStatusCode || 200,
       headers: { "Content-Type": "application/json" },
@@ -113,10 +115,12 @@ function unwrapExecutionResponse(result) {
   } catch (parseError) {
     console.error("JSON Parse Failed!");
     console.error("Error:", parseError.message);
-    console.error("Raw Appwrite ResponseBody:", result.responseBody);
-    console.error("Appwrite Response Status:", result.responseStatusCode);
+    
+    // Fallback: If it's not JSON (like plain text), just return the decoded string
+    let fallbackText = result.responseBody;
+    try { fallbackText = atob(result.responseBody); } catch(e) {}
 
-    return new Response(result.responseBody || "Invalid response", {
+    return new Response(fallbackText || "Invalid response", {
       status: result.responseStatusCode || 500,
     });
   }

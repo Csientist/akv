@@ -41,7 +41,7 @@ func Main(Context openruntimes.Context) openruntimes.Response {
 		return jsonOK(Context, map[string]interface{}{"status": "ok", "ts": time.Now().UTC().Format(time.RFC3339)})
 	}
 
-	// All other routes require a valid Appwrite API key
+	// All other routes require the valid proxy secret from Cloudflare
 	if !isAuthorized(Context) {
 		return jsonErr(Context, 401, "unauthorised")
 	}
@@ -58,16 +58,22 @@ func Main(Context openruntimes.Context) openruntimes.Response {
 	}
 }
 
-// isAuthorized checks for a matching Appwrite API key in the request headers.
-// Flutter calls arrive with the key set by AppwriteClient; Safaricom callbacks
-// do not — those routes bypass this check above.
+// ── Auth ──────────────────────────────────────────────────────────────────────
+
 func isAuthorized(Context openruntimes.Context) bool {
-	expected := os.Getenv("APPWRITE_API_KEY")
+	expected := os.Getenv("FUNCTION_INTERNAL_KEY")
 	if expected == "" {
+		Context.Log("[auth] FUNCTION_INTERNAL_KEY env var is missing")
 		return false
 	}
-	got := Context.Req.Headers["x-appwrite-key"]
-	return got == expected
+
+	// Check the injected header from the Cloudflare Worker proxy
+	got := Context.Req.Headers["x-proxy-secret"]
+	if got != expected {
+		Context.Log("[auth] invalid or missing x-proxy-secret header")
+		return false
+	}
+	return true
 }
 
 // ── Shared response helpers ───────────────────────────────────────────────────
@@ -99,7 +105,7 @@ func newDB() (*tablesdb.TablesDB, string, string) {
 	return db, os.Getenv("APPWRITE_DB_ID"), os.Getenv("APPWRITE_TABLE_FINANCIALS")
 }
 
-// ── FinancialRow (shared by M-PESA callback + eTIMS) ─────────────────────────
+// ── FinancialRow ──────────────────────────────────────────────────────────────
 
 type FinancialRow struct {
 	*models.Row
@@ -164,7 +170,7 @@ func handleStkPush(Context openruntimes.Context) openruntimes.Response {
 
 	if consumerKey == "" || consumerSecret == "" || shortcode == "" || passkey == "" || callbackURL == "" {
 		Context.Error("missing M-PESA env vars")
-		return jsonErr(Context, 500, "server misconfiguration — missing M-PESA credentials")
+		return jsonErr(Context, 500, "server misconfiguration")
 	}
 
 	baseURL := darajaBaseURL(env)
@@ -174,7 +180,9 @@ func handleStkPush(Context openruntimes.Context) openruntimes.Response {
 		return jsonErr(Context, 500, "M-PESA auth failed")
 	}
 
-	timestamp := time.Now().Format("20060102150405")
+	// East Africa Time (EAT) for Safaricom
+	eat := time.FixedZone("EAT", 3*60*60)
+	timestamp := time.Now().In(eat).Format("20060102150405")
 	password := base64.StdEncoding.EncodeToString([]byte(shortcode + passkey + timestamp))
 
 	stkPayload := map[string]interface{}{
@@ -188,7 +196,7 @@ func handleStkPush(Context openruntimes.Context) openruntimes.Response {
 		"PhoneNumber":       phone,
 		"CallBackURL":       callbackURL,
 		"AccountReference":  req.AccountRef,
-		"TransactionDesc":   "Akavango Farm Payment",
+		"TransactionDesc":   "Akavango Payment",
 	}
 
 	payloadBytes, _ := json.Marshal(stkPayload)
@@ -249,7 +257,6 @@ type darajaCallback struct {
 func handleMpesaCallback(Context openruntimes.Context) openruntimes.Response {
 	Context.Log("===== M-PESA CALLBACK =====")
 	raw := Context.Req.BodyRaw()
-	Context.Log("payload: " + raw)
 
 	var payload darajaCallback
 	if err := json.Unmarshal([]byte(raw), &payload); err != nil {
@@ -301,51 +308,38 @@ func handleMpesaCallback(Context openruntimes.Context) openruntimes.Response {
 	)
 	if err != nil {
 		Context.Error("UpdateRow failed for " + rowID + ": " + err.Error())
-	} else {
-		Context.Log("marked paid: " + rowID + " receipt: " + receipt)
 	}
 
 	return ack(Context)
 }
 
+// Safaricom requires a strict JSON success response, otherwise it will repeatedly retry
 func ack(Context openruntimes.Context) openruntimes.Response {
-	return Context.Res.Text("Success", Context.Res.WithStatusCode(200))
+	return jsonResp(Context, 200, map[string]interface{}{
+		"ResultCode": 0,
+		"ResultDesc": "Success",
+	})
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
 // HANDLER 3 — eTIMS Submit
 // ═════════════════════════════════════════════════════════════════════════════
-//
-// Receives a transaction_id, fetches the Financial row, builds an eTIMS
-// invoice payload, submits to KRA OSCU, then writes the KRA receipt + CU
-// serial back to the financials row.
-//
-// eTIMS OSCU API reference:
-//   Sandbox:    https://etims-sbx.kra.go.ke/etims-api
-//   Production: https://etims.kra.go.ke/etims-api
-//
-// Relevant endpoints used here:
-//   POST /saveInvoice    — submit a new tax invoice
 
 type etimsSubmitRequest struct {
 	TransactionID string      `json:"transaction_id"`
-	Items         []etimsItem `json:"items"`        // line items from Flutter
-	CustomerPIN   string      `json:"customer_pin"` // optional B2B
+	Items         []etimsItem `json:"items"`
+	CustomerPIN   string      `json:"customer_pin"`
 	CustomerName  string      `json:"customer_name"`
 }
 
 type etimsItem struct {
-	Name      string  `json:"name"`
-	Qty       float64 `json:"qty"`
-	UnitPrice float64 `json:"unit_price"`
-	// VAT rate code per KRA classification:
-	// "A" = 16% standard, "B" = 0% zero-rated, "C" = exempt
-	VatRateCode string `json:"vat_rate_code"`
+	Name        string  `json:"name"`
+	Qty         float64 `json:"qty"`
+	UnitPrice   float64 `json:"unit_price"`
+	VatRateCode string  `json:"vat_rate_code"`
 }
 
 func handleEtimsSubmit(Context openruntimes.Context) openruntimes.Response {
-	Context.Log("===== eTIMS SUBMIT =====")
-
 	var req etimsSubmitRequest
 	if err := json.Unmarshal([]byte(Context.Req.BodyRaw()), &req); err != nil {
 		return jsonErr(Context, 400, "invalid payload: "+err.Error())
@@ -353,27 +347,20 @@ func handleEtimsSubmit(Context openruntimes.Context) openruntimes.Response {
 	if req.TransactionID == "" {
 		return jsonErr(Context, 400, "transaction_id is required")
 	}
-	if len(req.Items) == 0 {
-		return jsonErr(Context, 400, "at least one line item is required")
-	}
 
-	// Load env
 	pin := os.Getenv("ETIMS_PIN")
 	branchID := os.Getenv("ETIMS_BRANCH_ID")
 	cmcKey := os.Getenv("ETIMS_CMC_KEY")
 	deviceSerial := os.Getenv("ETIMS_DEVICE_SERIAL")
-	etimsEnv := os.Getenv("ETIMS_ENVIRONMENT") // "sandbox" | "production"
+	etimsEnv := os.Getenv("ETIMS_ENVIRONMENT")
 
 	if pin == "" || branchID == "" || cmcKey == "" || deviceSerial == "" {
-		Context.Error("missing eTIMS env vars")
 		return jsonErr(Context, 500, "server misconfiguration — missing eTIMS credentials")
 	}
 
-	// Fetch the financial row from Appwrite so we have amount + date
 	db, dbID, tableID := newDB()
 	docResp, err := db.GetRow(dbID, tableID, req.TransactionID)
 	if err != nil {
-		Context.Error("GetRow failed: " + err.Error())
 		return jsonErr(Context, 404, "transaction not found: "+req.TransactionID)
 	}
 	var financial FinancialRow
@@ -381,7 +368,6 @@ func handleEtimsSubmit(Context openruntimes.Context) openruntimes.Response {
 		return jsonErr(Context, 500, "failed to decode financial row")
 	}
 
-	// Build invoice totals
 	var totalExVat, totalVat float64
 	type invoiceLine struct {
 		ItemNm    string  `json:"itemNm"`
@@ -411,30 +397,29 @@ func handleEtimsSubmit(Context openruntimes.Context) openruntimes.Response {
 		})
 	}
 	grandTotal := totalExVat + totalVat
-
-	// Invoice sequence — in production this must be a monotonically
-	// increasing integer per device; for now we use a timestamp-based
-	// surrogate until a proper sequence store is in place.
 	invoiceSeq := time.Now().UnixMilli()
 
-	now := time.Now().UTC()
+	// eTIMS requires strict local timezone (EAT) to avoid past/future rejections
+	eat := time.FixedZone("EAT", 3*60*60)
+	now := time.Now().In(eat)
+
 	invoice := map[string]interface{}{
 		"tpin":         pin,
 		"bhfId":        branchID,
 		"orgSdcId":     deviceSerial,
 		"orgInvcNo":    invoiceSeq,
 		"cisInvcNo":    fmt.Sprintf("INV-%s", req.TransactionID[:8]),
-		"custTpin":     req.CustomerPIN, // empty string = B2C
+		"custTpin":     req.CustomerPIN,
 		"custNm":       req.CustomerName,
-		"salesTyCd":    "N", // Normal sale
-		"rcptTyCd":     "S", // Sales receipt
+		"salesTyCd":    "N",
+		"rcptTyCd":     "S",
 		"pmtTyCd":      pmtTypeCode(financial.PaymentMethod),
-		"salesSttsCd":  "02", // Approved
+		"salesSttsCd":  "02",
 		"cfmDt":        now.Format("20060102150405"),
 		"salesDt":      now.Format("20060102"),
 		"stockRlsDt":   now.Format("20060102150405"),
 		"totItemCnt":   len(lines),
-		"taxblAmtA":    round2(totalExVat), // taxable at 16%
+		"taxblAmtA":    round2(totalExVat),
 		"taxblAmtB":    0,
 		"taxblAmtC":    0,
 		"taxblAmtD":    0,
@@ -451,11 +436,9 @@ func handleEtimsSubmit(Context openruntimes.Context) openruntimes.Response {
 		"itemList":     lines,
 	}
 
-	// Sign the payload
 	sig := etimsSign(cmcKey, invoice)
 	invoice["signature"] = sig
 
-	// Submit to KRA
 	baseURL := etimsBaseURL(etimsEnv)
 	endpoint := baseURL + "/saveInvoice"
 
@@ -468,14 +451,11 @@ func handleEtimsSubmit(Context openruntimes.Context) openruntimes.Response {
 	httpClient := &http.Client{Timeout: 20 * time.Second}
 	resp, err := httpClient.Do(httpReq)
 	if err != nil {
-		Context.Error("eTIMS HTTP error: " + err.Error())
 		return jsonErr(Context, 502, "failed to reach KRA eTIMS — will retry")
 	}
 	defer resp.Body.Close()
 
 	body, _ := io.ReadAll(resp.Body)
-	Context.Log("eTIMS response: " + string(body))
-
 	var etimsResp map[string]interface{}
 	if err := json.Unmarshal(body, &etimsResp); err != nil {
 		return jsonErr(Context, 500, "unexpected response from KRA eTIMS")
@@ -484,8 +464,6 @@ func handleEtimsSubmit(Context openruntimes.Context) openruntimes.Response {
 	resultCd, _ := etimsResp["resultCd"].(string)
 	if resultCd != "000" {
 		msg, _ := etimsResp["resultMsg"].(string)
-		Context.Error(fmt.Sprintf("eTIMS rejection — code: %s msg: %s", resultCd, msg))
-		// Write the failure back so the app can surface it and retry
 		_, _ = db.UpdateRow(dbID, tableID, financial.Id,
 			db.WithUpdateRowData(map[string]interface{}{
 				"is_kra_certified": false,
@@ -495,18 +473,14 @@ func handleEtimsSubmit(Context openruntimes.Context) openruntimes.Response {
 		return jsonErr(Context, 422, fmt.Sprintf("KRA rejected invoice: %s — %s", resultCd, msg))
 	}
 
-	// Extract the official KRA receipt details
 	rcptInfo, _ := etimsResp["data"].(map[string]interface{})
-	kraReceipt := ""
-	kraSerial := ""
-	kraSignature := ""
+	kraReceipt, kraSerial, kraSignature := "", "", ""
 	if rcptInfo != nil {
 		kraReceipt, _ = rcptInfo["rcptNo"].(string)
 		kraSerial, _ = rcptInfo["sdcId"].(string)
 		kraSignature, _ = rcptInfo["intrlData"].(string)
 	}
 
-	// Write confirmed KRA details back to Appwrite
 	_, err = db.UpdateRow(dbID, tableID, financial.Id,
 		db.WithUpdateRowData(map[string]interface{}{
 			"is_kra_certified": true,
@@ -515,11 +489,7 @@ func handleEtimsSubmit(Context openruntimes.Context) openruntimes.Response {
 			"kra_signature":    kraSignature,
 		}),
 	)
-	if err != nil {
-		Context.Error("UpdateRow (KRA fields) failed: " + err.Error())
-	}
 
-	Context.Log(fmt.Sprintf("eTIMS OK — receipt: %s serial: %s", kraReceipt, kraSerial))
 	return jsonOK(Context, map[string]interface{}{
 		"success":       true,
 		"kra_receipt":   kraReceipt,
@@ -532,10 +502,6 @@ func handleEtimsSubmit(Context openruntimes.Context) openruntimes.Response {
 // ═════════════════════════════════════════════════════════════════════════════
 // HANDLER 4 — eTIMS Query
 // ═════════════════════════════════════════════════════════════════════════════
-//
-// Polls KRA for the status of a previously submitted invoice.
-// Useful for the retry loop — if submission timed out but KRA may have
-// received it, query before resubmitting to avoid duplicates.
 
 type etimsQueryRequest struct {
 	TransactionID string `json:"transaction_id"`
@@ -543,14 +509,9 @@ type etimsQueryRequest struct {
 }
 
 func handleEtimsQuery(Context openruntimes.Context) openruntimes.Response {
-	Context.Log("===== eTIMS QUERY =====")
-
 	var req etimsQueryRequest
 	if err := json.Unmarshal([]byte(Context.Req.BodyRaw()), &req); err != nil {
 		return jsonErr(Context, 400, "invalid payload")
-	}
-	if req.TransactionID == "" {
-		return jsonErr(Context, 400, "transaction_id is required")
 	}
 
 	pin := os.Getenv("ETIMS_PIN")
@@ -579,9 +540,7 @@ func handleEtimsQuery(Context openruntimes.Context) openruntimes.Response {
 
 	body, _ := io.ReadAll(resp.Body)
 	var result map[string]interface{}
-	if err := json.Unmarshal(body, &result); err != nil {
-		return jsonErr(Context, 500, "unexpected response from KRA")
-	}
+	json.Unmarshal(body, &result)
 
 	return jsonOK(Context, map[string]interface{}{
 		"success":  true,
@@ -600,8 +559,6 @@ func etimsBaseURL(env string) string {
 	return "https://etims-sbx.kra.go.ke/etims-api"
 }
 
-// etimsSign creates an HMAC-SHA256 signature of the JSON payload using the
-// CMC Key issued by KRA during device initialisation.
 func etimsSign(cmcKey string, payload map[string]interface{}) string {
 	data, _ := json.Marshal(payload)
 	mac := hmac.New(sha256.New, []byte(cmcKey))
@@ -609,25 +566,21 @@ func etimsSign(cmcKey string, payload map[string]interface{}) string {
 	return hex.EncodeToString(mac.Sum(nil))
 }
 
-// vatRate returns the decimal multiplier for a given KRA VAT rate code.
 func vatRate(code string) float64 {
 	switch strings.ToUpper(code) {
 	case "A":
-		return 0.16 // 16% standard
-	case "B":
-		return 0.0 // 0% zero-rated
-	case "C":
-		return 0.0 // exempt
+		return 0.16
+	case "B", "C":
+		return 0.0
 	default:
 		return 0.16
 	}
 }
 
-// pmtTypeCode maps our internal PaymentMethod string to KRA's code.
 func pmtTypeCode(method string) string {
 	switch strings.ToLower(method) {
 	case "mpesa":
-		return "03" // Mobile money
+		return "03"
 	case "cash":
 		return "01"
 	case "bank":
@@ -643,7 +596,7 @@ func round2(v float64) float64 {
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
-// M-PESA helpers (shared with STK push + callback)
+// M-PESA helpers
 // ═════════════════════════════════════════════════════════════════════════════
 
 func sanitizePhone(raw string) (string, error) {
@@ -654,7 +607,6 @@ func sanitizePhone(raw string) (string, error) {
 	case strings.HasPrefix(cleaned, "0"):
 		cleaned = "254" + cleaned[1:]
 	case strings.HasPrefix(cleaned, "254"):
-		// already correct
 	default:
 		return "", fmt.Errorf("unrecognised phone format: %s", raw)
 	}
@@ -685,22 +637,16 @@ func getAccessToken(key, secret, baseURL string) (string, error) {
 	defer resp.Body.Close()
 
 	var result map[string]interface{}
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		return "", fmt.Errorf("failed to decode token response: %w", err)
+	json.NewDecoder(resp.Body).Decode(&result)
+	if token, ok := result["access_token"].(string); ok && token != "" {
+		return token, nil
 	}
-	token, ok := result["access_token"].(string)
-	if !ok || token == "" {
-		errMsg, _ := result["errorMessage"].(string)
-		return "", fmt.Errorf("no access token returned: %s", errMsg)
-	}
-	return token, nil
+	return "", fmt.Errorf("no access token returned")
 }
 
 func markFinancialFailed(db *tablesdb.TablesDB, dbID, tableID, checkoutID, reason string) error {
 	listResp, err := db.ListRows(dbID, tableID,
-		db.WithListRowsQueries([]string{
-			query.Equal("checkout_request_id", checkoutID),
-		}),
+		db.WithListRowsQueries([]string{query.Equal("checkout_request_id", checkoutID)}),
 	)
 	if err != nil {
 		return fmt.Errorf("ListRows failed: %w", err)
