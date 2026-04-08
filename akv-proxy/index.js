@@ -81,7 +81,6 @@ export default {
   }
 };
 
-// ... keep your existing routeToFunction, unwrapExecutionResponse, etc. below ...
 // ─────────────────────────────────────────────
 // ROUTE TO APPWRITE FUNCTION
 // ─────────────────────────────────────────────
@@ -124,6 +123,7 @@ const appwritePayload = {
 // RESPONSE UNWRAP
 // ─────────────────────────────────────────────
 function unwrapExecutionResponse(result) {
+  // Catch hard Appwrite API failures
   if (result.responseBody === undefined) {
     console.error("Appwrite API Call Failed!");
     return new Response(`Appwrite Gateway Error: ${result.message || "Unknown"}`, { 
@@ -131,27 +131,35 @@ function unwrapExecutionResponse(result) {
     });
   }
 
+  let responseText = result.responseBody;
+
+  // SMART DECODE: Attempt to Base64 decode, but safely fall back if it fails
   try {
-    // 🔴 THE FIX: Decode Appwrite's Base64 payload back into a normal string
-    const decodedString = atob(result.responseBody);
-    
-    // Now safely parse the decoded string into a JSON object
-    const body = JSON.parse(decodedString);
+    // If it clearly already looks like JSON, don't try to decode it
+    if (typeof responseText === 'string' && !responseText.trim().startsWith('{') && !responseText.trim().startsWith('[')) {
+      responseText = atob(responseText);
+    }
+  } catch (decodeError) {
+    // atob() failed (meaning it wasn't Base64). 
+    // We swallow the error and leave responseText exactly as Appwrite sent it.
+  }
+
+  try {
+    // Parse the safely resolved string into a JSON object
+    const body = JSON.parse(responseText);
     
     return new Response(JSON.stringify(body), {
       status: result.responseStatusCode || 200,
       headers: { "Content-Type": "application/json" },
     });
   } catch (parseError) {
+    // Fallback: If it's valid text but NOT JSON (e.g., an HTML error page or raw string)
     console.error("JSON Parse Failed!");
-    console.error("Error:", parseError.message);
-    
-    // Fallback: If it's not JSON (like plain text), just return the decoded string
-    let fallbackText = result.responseBody;
-    try { fallbackText = atob(result.responseBody); } catch(e) {}
+    console.error("Raw responseText:", responseText);
 
-    return new Response(fallbackText || "Invalid response", {
-      status: result.responseStatusCode || 500,
+    return new Response(responseText || "Invalid response format", {
+      // Preserve Appwrite's original status code, default to 500 only if missing
+      status: result.responseStatusCode || 500, 
     });
   }
 }
