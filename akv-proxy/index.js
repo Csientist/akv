@@ -1,3 +1,19 @@
+// 1. Define your strict whitelists outside the fetch block for speed
+const CORE_ALLOWED_PATHS = new Set([
+  "/health",
+  "/heartbeat/log",
+  "/heartbeat/cleanup",
+  "/heartbeat/list"
+]);
+
+const INTEGRATION_ALLOWED_PATHS = new Set([
+  "/health",
+  "/mpesa/callback",
+  "/mpesa/stk-push",
+  "/etims/submit",
+  "/etims/query"
+]);
+
 export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
@@ -5,7 +21,7 @@ export default {
     const hostname = url.hostname;
 
     try {
-      // 0. Intercept standard bot/browser paths
+      // Allow robots.txt to respond politely to Googlebot/ClaudeBot
       if (path === "/robots.txt") {
         return new Response("User-agent: *\nDisallow: /", { 
           status: 200, 
@@ -13,36 +29,49 @@ export default {
         });
       }
 
-      if (path === "/" || path === "/favicon.ico") {
-        return new Response("Not Found", { status: 404 });
-      }
-      // 1. Internal/Utility Routes
+      // Simulation trigger
       if (path.startsWith("/sim/")) {
-        // CRITICAL FIX: ctx.waitUntil keeps the worker alive after responding
-        // so your background sleep() and fetch() calls actually complete.
         ctx.waitUntil(runSimulation(env));
         return new Response("Simulation triggered in background", { status: 202 });
       }
 
-      // 2. Domain-Based Routing (Production)
-      // Pass an empty string "" for prefix so the full path is preserved
+      // ─────────────────────────────────────────────
+      // PRODUCTION DOMAIN ROUTING
+      // ─────────────────────────────────────────────
       if (hostname === "api.33373984.xyz" || hostname === env.CORE_DOMAIN) {
+        if (!CORE_ALLOWED_PATHS.has(path)) {
+          return new Response("Forbidden: Endpoint not allowed", { status: 403 });
+        }
         return await routeToFunction(request, env, env.CORE_FUNCTION_ID, "");
       }
 
       if (hostname === "akavango.33373984.xyz" || hostname === env.INTEGRATION_DOMAIN) {
+        if (!INTEGRATION_ALLOWED_PATHS.has(path)) {
+          return new Response("Forbidden: Endpoint not allowed", { status: 403 });
+        }
         return await routeToFunction(request, env, env.INTEGRATION_FUNCTION_ID, "");
       }
 
-      // 3. Path-Based Routing (Fallback for local dev or .workers.dev testing)
+      // ─────────────────────────────────────────────
+      // FALLBACK PATH ROUTING (Local Dev / workers.dev)
+      // ─────────────────────────────────────────────
       if (path.startsWith("/api/")) {
+        const internalPath = path.replace("/api", "");
+        if (!CORE_ALLOWED_PATHS.has(internalPath)) {
+          return new Response("Forbidden: Endpoint not allowed", { status: 403 });
+        }
         return await routeToFunction(request, env, env.CORE_FUNCTION_ID, "/api");
       }
 
       if (path.startsWith("/akavango/")) {
+        const internalPath = path.replace("/akavango", "");
+        if (!INTEGRATION_ALLOWED_PATHS.has(internalPath)) {
+          return new Response("Forbidden: Endpoint not allowed", { status: 403 });
+        }
         return await routeToFunction(request, env, env.INTEGRATION_FUNCTION_ID, "/akavango");
       }
 
+      // Catch anything else (like random bot scans on root "/")
       return new Response("Not found", { status: 404 });
 
     } catch (err) {
@@ -52,6 +81,7 @@ export default {
   }
 };
 
+// ... keep your existing routeToFunction, unwrapExecutionResponse, etc. below ...
 // ─────────────────────────────────────────────
 // ROUTE TO APPWRITE FUNCTION
 // ─────────────────────────────────────────────
