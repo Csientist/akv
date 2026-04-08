@@ -3,7 +3,7 @@ import 'package:flutter/services.dart';
 import 'dart:async';
 import 'package:uuid/uuid.dart';
 import '../../data/models/models.dart';
-import '../../data/repositories/ledger_repository.dart';
+import '../../../../data/repositories/repositories.dart';
 import '../../services/app_refresh_service.dart';
 import '../../services/mpesa_listener_service.dart';
 import '../../services/session_manager.dart';
@@ -126,7 +126,7 @@ class _TransactionForm extends StatefulWidget {
 
 class _TransactionFormState extends State<_TransactionForm> {
   final _formKey       = GlobalKey<FormState>();
-  final _repo          = LedgerRepository();
+  final _repo          = FinanceRepository();
   final _nameCtrl      = TextEditingController();
   final _amountCtrl    = TextEditingController();
   final _descCtrl      = TextEditingController();
@@ -402,7 +402,7 @@ class _HistoryTab extends StatefulWidget {
 }
 
 class _HistoryTabState extends State<_HistoryTab> {
-  final _repo = LedgerRepository();
+  final _repo = FinanceRepository();
   late Future<List<Financial>> _future;
   StreamSubscription<void>?  _refreshSub;
   StreamSubscription<MpesaConfirmation>? _mpesaSub;
@@ -522,7 +522,7 @@ class _HistoryTabState extends State<_HistoryTab> {
 
 class _TxnTile extends StatelessWidget {
   final Financial record;
-  final LedgerRepository repo;
+  final FinanceRepository repo;
   final VoidCallback onPaymentRecorded;
   const _TxnTile({
     required this.record,
@@ -663,7 +663,7 @@ class _TxnTile extends StatelessWidget {
 
 class _RecordPaymentSheet extends StatefulWidget {
   final Financial record;
-  final LedgerRepository repo;
+  final FinanceRepository repo;
   final VoidCallback onSaved;
   const _RecordPaymentSheet(
       {required this.record, required this.repo, required this.onSaved});

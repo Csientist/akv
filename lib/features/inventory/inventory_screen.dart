@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:uuid/uuid.dart';
 import '../../data/models/models.dart';
-import '../../data/repositories/ledger_repository.dart';
+import '../../data/repositories/repositories.dart';
 import '../../services/app_refresh_service.dart';
 import '../../services/session_manager.dart';
 
@@ -15,7 +15,7 @@ class InventoryScreen extends StatefulWidget {
 }
 
 class _InventoryScreenState extends State<InventoryScreen> {
-  final _repo = LedgerRepository();
+  final _repo = InventoryRepository();
   late Future<List<InventoryItem>> _future;
   InventoryCategory? _filter;
   StreamSubscription<void>? _refreshSub;
