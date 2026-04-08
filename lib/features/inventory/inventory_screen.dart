@@ -2,7 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:uuid/uuid.dart';
-import '../../data/models/ledger_entry.dart';
+import '../../data/models/models.dart';
 import '../../data/repositories/ledger_repository.dart';
 import '../../services/app_refresh_service.dart';
 import '../../services/session_manager.dart';

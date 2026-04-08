@@ -3,7 +3,7 @@ import 'package:uuid/uuid.dart';
 import '../../core/local_db.dart';
 import '../../services/session_manager.dart';
 import '../../services/sync_service.dart';
-import '../models/ledger_entry.dart';
+import '../models/models.dart';
 
 const _uuid = Uuid();
 
