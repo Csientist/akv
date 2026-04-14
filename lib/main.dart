@@ -15,11 +15,11 @@ import 'services/sync_service.dart';
 
 // ── Feature Screen Imports ───────────────────────────────────────────────────
 import 'features/sales/new_sales_screen.dart'; 
-import 'features/herd/herd_screen.dart';
 import 'features/inventory/inventory_screen.dart';
-import 'features/dashboard/dashboard_screen.dart';
 import 'features/auth/auth_gate.dart';
-import 'features/flock/flock_logs_screen.dart'; // We will create this next
+import 'features/flock/flock_logs_screen.dart';
+import 'features/herd/presentation/herd_screen.dart';
+import 'features/dashboard/presentation/dashboard_screen.dart';
 
 void main() async {
   // 1. Ensure Flutter binding is ready before calling native code

@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:uuid/uuid.dart';
-import '../../data/models/ledger_entry.dart';
-import '../../data/repositories/ledger_repository.dart';
+import '../../data/models/models.dart';
+import '../../data/repositories/repositories.dart';
 import '../../services/mpesa_service.dart';
 import '../../services/session_manager.dart';
 
@@ -40,7 +40,7 @@ class CheckoutSheet extends StatefulWidget {
 }
 
 class _CheckoutSheetState extends State<CheckoutSheet> {
-  final _repo          = LedgerRepository();
+  final _repo          = FinanceRepository();
   final _inputCtrl     = TextEditingController();
   _CheckoutMode _mode  = _CheckoutMode.mpesaStk;
   bool _isProcessing   = false;

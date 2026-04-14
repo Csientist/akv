@@ -3,12 +3,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:uuid/uuid.dart';
-import '../../data/models/ledger_entry.dart';
-import '../../data/repositories/ledger_repository.dart';
+import '../../data/models/models.dart';
+import '../../data/repositories/repositories.dart';
 import '../../services/app_refresh_service.dart';
 import '../../services/asset_image_widget.dart';
 import '../../services/image_service.dart';
 import '../../services/session_manager.dart';
+import '../../shared/widgets/shared_widgets.dart';
+
 
 class HerdManagementScreen extends StatefulWidget {
   const HerdManagementScreen({super.key});
@@ -18,7 +20,7 @@ class HerdManagementScreen extends StatefulWidget {
 
 class _HerdManagementScreenState extends State<HerdManagementScreen>
     with SingleTickerProviderStateMixin {
-  final _repo = LedgerRepository();
+  final _repo = HerdRepository();
   late TabController _tabController;
   late Future<List<Asset>> _livestockFuture;
   late Future<List<Asset>> _cropFuture;
@@ -123,7 +125,7 @@ class _AssetList extends StatelessWidget {
   final Future<List<Asset>> future;
   final AssetCategory category;
   final VoidCallback onRefresh;
-  final LedgerRepository repo;
+  final HerdRepository repo;
   const _AssetList({required this.future, required this.category, required this.onRefresh, required this.repo});
 
   @override
@@ -139,10 +141,14 @@ class _AssetList extends StatelessWidget {
           children: [
             _SummaryBanner(assets: assets, category: category),
             const SizedBox(height: 20),
-            const _SectionLabel('Animals'),
+            const SectionLabel('Animals'),
             const SizedBox(height: 10),
             if (assets.isEmpty)
-              _EmptyState(category: category)
+              EmptyStateView(
+                icon: category == AssetCategory.livestock ? Icons.pets : Icons.grass,
+                title: 'No ${category == AssetCategory.livestock ? 'livestock' : 'crops'} registered',
+                subtitle: 'Tap Register to add one',
+              )
             else
               ...assets.map((a) => _AnimalCard(asset: a, onRefresh: onRefresh, repo: repo)),
           ],
@@ -189,7 +195,7 @@ class _Stat extends StatelessWidget {
 class _AnimalCard extends StatelessWidget {
   final Asset asset;
   final VoidCallback onRefresh;
-  final LedgerRepository repo;
+  final HerdRepository repo;
   const _AnimalCard({required this.asset, required this.onRefresh, required this.repo});
 
   @override
@@ -287,7 +293,7 @@ class _AnimalCard extends StatelessWidget {
 
 class _AnimalDetailSheet extends StatefulWidget {
   final Asset asset;
-  final LedgerRepository repo;
+  final HerdRepository repo;
   final VoidCallback onRefresh;
   const _AnimalDetailSheet({required this.asset, required this.repo, required this.onRefresh});
   @override
@@ -407,7 +413,7 @@ class _AnimalDetailSheetState extends State<_AnimalDetailSheet> {
             const SizedBox(height: 20),
 
             // Photos
-            const _SectionLabel('Photos'),
+            const SectionLabel('Photos'),
             const SizedBox(height: 10),
             AssetImageStrip(
               images:    _images,
@@ -431,7 +437,7 @@ class _AnimalDetailSheetState extends State<_AnimalDetailSheet> {
             const SizedBox(height: 24),
 
             // Event timeline
-            const _SectionLabel('Activity Timeline'),
+            const SectionLabel('Activity Timeline'),
             const SizedBox(height: 12),
             FutureBuilder<List<AssetEvent>>(
               future: _eventsFuture,
@@ -634,7 +640,7 @@ class _EmptyTimeline extends StatelessWidget {
 
 class _LogEventSheet extends StatefulWidget {
   final Asset asset;
-  final LedgerRepository repo;
+  final HerdRepository repo;
   final VoidCallback onSaved;
   final AssetEvent? existing; // non-null = edit mode
   const _LogEventSheet({
@@ -1039,7 +1045,7 @@ class _LogEventSheetState extends State<_LogEventSheet> {
         const SizedBox(height: 20),
 
         // Event type grid
-        const _SectionLabel('Activity Type'),
+        const SectionLabel('Activity Type'),
         const SizedBox(height: 10),
         Wrap(
           spacing: 8, runSpacing: 8,
@@ -1104,7 +1110,7 @@ class _LogEventSheetState extends State<_LogEventSheet> {
         const SizedBox(height: 20),
 
         // Photos (1 image per event)
-        const _SectionLabel('Photo'),
+        const SectionLabel('Photo'),
         const SizedBox(height: 10),
         AssetImageStrip(
           images:    _images,
@@ -1343,7 +1349,7 @@ class _AddAssetSheetState extends State<_AddAssetSheet> {
               decoration: const InputDecoration(labelText: 'Weight (kg)', hintText: 'e.g. 340', prefixIcon: Icon(Icons.monitor_weight_outlined, size: 18)),
             )),
             const SizedBox(width: 12),
-            Expanded(child: _DatePickerField(
+            Expanded(child: AppDatePicker(
               label: 'Date of Birth',
               selected: _dateOfBirth,
               onPicked: (d) => setState(() => _dateOfBirth = d),
@@ -1436,83 +1442,6 @@ class _AssetThumbnail extends StatelessWidget {
           ),
         );
       },
-    );
-  }
-}
-
-// ── Shared Widgets ────────────────────────────────────────────────────────────
-
-class _SectionLabel extends StatelessWidget {
-  final String text;
-  const _SectionLabel(this.text);
-  @override
-  Widget build(BuildContext context) => Text(text.toUpperCase(),
-      style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: Color(0xFF2D6A4F), letterSpacing: 1.6));
-}
-
-class _EmptyState extends StatelessWidget {
-  final AssetCategory category;
-  const _EmptyState({required this.category});
-  @override
-  Widget build(BuildContext context) => Center(
-    child: Padding(
-      padding: const EdgeInsets.all(40),
-      child: Column(children: [
-        Icon(category == AssetCategory.livestock ? Icons.pets : Icons.grass, size: 56, color: Colors.grey.shade300),
-        const SizedBox(height: 12),
-        Text('No ${category == AssetCategory.livestock ? 'livestock' : 'crops'} registered',
-            style: TextStyle(color: Colors.grey.shade500, fontWeight: FontWeight.w600)),
-        const SizedBox(height: 4),
-        Text('Tap Register to add one', style: TextStyle(color: Colors.grey.shade400, fontSize: 12)),
-      ]),
-    ),
-  );
-}
-
-class _DatePickerField extends StatelessWidget {
-  final String label;
-  final DateTime? selected;
-  final ValueChanged<DateTime> onPicked;
-  const _DatePickerField({required this.label, required this.selected, required this.onPicked});
-
-  String get _display => selected == null ? 'Tap to select'
-      : '${selected!.day.toString().padLeft(2,'0')}/${selected!.month.toString().padLeft(2,'0')}/${selected!.year}';
-
-  @override
-  Widget build(BuildContext context) {
-    final hasValue = selected != null;
-    return GestureDetector(
-      onTap: () async {
-        final picked = await showDatePicker(
-          context: context,
-          initialDate: selected ?? DateTime.now().subtract(const Duration(days: 365)),
-          firstDate: DateTime(2000), lastDate: DateTime.now(),
-          helpText: 'Select Date of Birth',
-          builder: (ctx, child) => Theme(
-            data: Theme.of(ctx).copyWith(colorScheme: Theme.of(ctx).colorScheme.copyWith(primary: const Color(0xFF2D6A4F))),
-            child: child!,
-          ),
-        );
-        if (picked != null) onPicked(picked);
-      },
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          border: Border.all(color: hasValue ? const Color(0xFF2D6A4F) : const Color(0xFFD8E8E0), width: hasValue ? 1.5 : 1),
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Row(children: [
-          Icon(Icons.cake_outlined, size: 18, color: hasValue ? const Color(0xFF2D6A4F) : Colors.grey.shade400),
-          const SizedBox(width: 8),
-          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(label, style: TextStyle(fontSize: 10, color: hasValue ? const Color(0xFF2D6A4F) : Colors.grey.shade500, fontWeight: FontWeight.w600)),
-            const SizedBox(height: 1),
-            Text(_display, style: TextStyle(fontSize: 13, color: hasValue ? const Color(0xFF1B4332) : Colors.grey.shade400,
-                fontWeight: hasValue ? FontWeight.w600 : FontWeight.w400)),
-          ])),
-        ]),
-      ),
     );
   }
 }

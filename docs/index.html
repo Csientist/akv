@@ -4,6 +4,10 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Akavango Farm Manager — Documentation</title>
+
+<link rel="icon" type="image/png" href="assets/logo.png">
+<link rel="apple-touch-icon" href="assets/logo.png">
+
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=DM+Mono:wght@400;500&family=Lora:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="css/styles.css">
@@ -22,7 +26,7 @@
     <li><a href="#" onclick="showPage('start')" id="nav-start">Getting Started</a></li>
     <li><a href="#" onclick="showPage('arch')" id="nav-arch">Architecture</a></li>
     <li><a href="#" onclick="showPage('changelog')" id="nav-changelog">Changelog</a></li>
-    <li><span class="nav-badge">Beta v0.3.0</span></li>
+    <li><span class="nav-badge">Beta v0.4.0</span></li>
   </ul>
   <button class="nav-hamburger" id="hamburger" aria-label="Toggle menu" onclick="toggleDrawer()">
     <span></span><span></span><span></span>
@@ -34,7 +38,7 @@
   <a href="#" onclick="showPage('start');closeDrawer()" id="drawer-start">Getting Started</a>
   <a href="#" onclick="showPage('arch');closeDrawer()" id="drawer-arch">Architecture</a>
   <a href="#" onclick="showPage('changelog');closeDrawer()" id="drawer-changelog">Changelog</a>
-  <span class="nav-badge">Beta v0.3.0</span>
+  <span class="nav-badge">Beta v0.4.0</span>
 </div>
 
 <div id="page-home" class="page active">
@@ -305,7 +309,7 @@
       <a href="#" onclick="showPage('changelog')">Changelog</a>
       <a href="#" onclick="showPage('arch')">Architecture</a>
     </div>
-    <div class="footer-meta">Beta v0.3.0 · Flutter · Appwrite Cloud</div>
+    <div class="footer-meta">Beta v0.4.0 · Flutter · Appwrite Cloud</div>
   </footer>
 </div>
 
@@ -446,7 +450,7 @@ Allowed    : image/jpeg</code></pre>
         <div class="step-body">
           <h4>Launch the app</h4>
           <pre><code>flutter run --debug</code></pre>
-          <p>On first launch the app creates the local SQLite schema (version 2). You'll be prompted to set a PIN.</p>
+          <p>On first launch the app creates the local SQLite schema. You'll be prompted to set a PIN.</p>
         </div>
       </div>
       <div class="step">
@@ -740,9 +744,33 @@ Daraja Callback → Cloudflare Worker → Appwrite Function (Go)
 
   <div class="release">
     <div class="release-meta">
-      <div class="release-version">v0.3.0</div>
+      <div class="release-version">v0.4.0</div>
       <div class="release-date">2026 — Q2</div>
       <span class="release-badge badge-latest">Latest · Beta</span>
+    </div>
+    <div class="release-body">
+      <h3>Architecture & Codebase Modularisation</h3>
+      <p style="font-size:.88rem;color:#2e4a32;margin-bottom:1.2rem;">A major structural refactor moving the codebase to a Feature-Driven Architecture. No changes to database schema or Appwrite cloud functionality.</p>
+
+      <div class="change-group">
+        <div class="change-group-label changed">↺ Changed</div>
+        <ul class="change-list">
+          <li><strong>Data Layer:</strong> Split the monolithic <code>LedgerRepository</code> into 5 domain-specific repositories (<code>FinanceRepository</code>, <code>HerdRepository</code>, <code>InventoryRepository</code>, <code>FlockRepository</code>, <code>DashboardRepository</code>).</li>
+          <li><strong>Models:</strong> Extracted models from a single file into individual files under <code>lib/data/models/</code> with a unified barrel file.</li>
+          <li><strong>UI Shared Widgets:</strong> Extracted reusable UI components (<code>EmptyStateView</code>, <code>AppDatePicker</code>, etc.) into <code>lib/shared/widgets/</code> to enforce DRY principles across screens.</li>
+          <li><strong>Herd Screen:</strong> Deconstructed <code>herd_screen.dart</code> into localized presentation folders (<code>widgets/</code>, <code>components/</code>, <code>sheets/</code>).</li>
+          <li><strong>Dashboard Screen:</strong> Cleaned up the main dashboard file by extracting specific UI cards (<code>NetPositionCard</code>, <code>MonthlySummaryCard</code>, etc.) into their own widget files.</li>
+          <li><strong>Web Docs:</strong> Modularized documentation into separate HTML, CSS, and JS files for improved caching and maintainability.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <div class="release">
+    <div class="release-meta">
+      <div class="release-version">v0.3.0</div>
+      <div class="release-date">2026 — Q2</div>
+      <span class="release-badge badge-beta">Beta</span>
     </div>
     <div class="release-body">
       <h3>Pasture Logging & Monthly KPIs</h3>

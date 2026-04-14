@@ -5,9 +5,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:uuid/uuid.dart';
 
-import '../../data/models/ledger_entry.dart';
-import '../../data/repositories/ledger_repository.dart';
+import '../../data/models/models.dart';
+import '../../data/repositories/repositories.dart';
 import '../../services/app_refresh_service.dart';
+import '../../shared/widgets/shared_widgets.dart';
+
 
 class FlockLogsScreen extends StatefulWidget {
   const FlockLogsScreen({super.key});
@@ -17,7 +19,7 @@ class FlockLogsScreen extends StatefulWidget {
 }
 
 class _FlockLogsScreenState extends State<FlockLogsScreen> {
-  final _repo = LedgerRepository();
+  final _repo = FlockRepository();
   late Future<List<FlockLog>> _logsFuture;
   StreamSubscription<void>? _refreshSub;
 
@@ -363,7 +365,7 @@ class _EmptyFlockState extends StatelessWidget {
 // ── Add Log Sheet ────────────────────────────────────────────────────────────
 
 class _AddFlockLogSheet extends StatefulWidget {
-  final LedgerRepository repo;
+  final FlockRepository repo;
   final VoidCallback onSaved;
 
   const _AddFlockLogSheet({required this.repo, required this.onSaved});
@@ -470,7 +472,7 @@ class _AddFlockLogSheetState extends State<_AddFlockLogSheet> {
               const SizedBox(height: 20),
 
               // Date Picker
-              _DatePickerField(
+              AppDatePicker(
                 label: 'Log Date',
                 selected: _recordedAt,
                 onPicked: (d) => setState(() => _recordedAt = d),
@@ -627,85 +629,6 @@ class _AddFlockLogSheetState extends State<_AddFlockLogSheet> {
               ),
             ],
           ),
-        ),
-      ),
-    );
-  }
-}
-
-// ── Shared Date Picker (Reused styling from HerdScreen) ──────────────────────
-
-class _DatePickerField extends StatelessWidget {
-  final String label;
-  final DateTime? selected;
-  final ValueChanged<DateTime> onPicked;
-  const _DatePickerField(
-      {required this.label, required this.selected, required this.onPicked});
-
-  String get _display => selected == null
-      ? 'Tap to select'
-      : '${selected!.day.toString().padLeft(2, '0')}/${selected!.month.toString().padLeft(2, '0')}/${selected!.year}';
-
-  @override
-  Widget build(BuildContext context) {
-    final hasValue = selected != null;
-    return GestureDetector(
-      onTap: () async {
-        final picked = await showDatePicker(
-          context: context,
-          initialDate: selected ?? DateTime.now(),
-          firstDate: DateTime(2020),
-          lastDate: DateTime.now().add(const Duration(days: 30)),
-          builder: (ctx, child) => Theme(
-            data: Theme.of(ctx).copyWith(
-                colorScheme: Theme.of(ctx)
-                    .colorScheme
-                    .copyWith(primary: const Color(0xFF2D6A4F))),
-            child: child!,
-          ),
-        );
-        if (picked != null) onPicked(picked);
-      },
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          border: Border.all(
-              color: hasValue ? const Color(0xFF2D6A4F) : const Color(0xFFD8E8E0),
-              width: hasValue ? 1.5 : 1),
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Row(
-          children: [
-            Icon(Icons.calendar_today_outlined,
-                size: 18,
-                color:
-                    hasValue ? const Color(0xFF2D6A4F) : Colors.grey.shade400),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(label,
-                      style: TextStyle(
-                          fontSize: 10,
-                          color: hasValue
-                              ? const Color(0xFF2D6A4F)
-                              : Colors.grey.shade500,
-                          fontWeight: FontWeight.w600)),
-                  const SizedBox(height: 1),
-                  Text(_display,
-                      style: TextStyle(
-                          fontSize: 13,
-                          color: hasValue
-                              ? const Color(0xFF1B4332)
-                              : Colors.grey.shade400,
-                          fontWeight:
-                              hasValue ? FontWeight.w600 : FontWeight.w400)),
-                ],
-              ),
-            ),
-          ],
         ),
       ),
     );
