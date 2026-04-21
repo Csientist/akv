@@ -22,32 +22,17 @@ class MpesaConfirmation {
 
 // ── Service ───────────────────────────────────────────────────────────────────
 
-/// Watches Appwrite for M-PESA STK confirmations and writes them back to
-/// local SQLite. Uses two complementary strategies:
-///
-///   1. Realtime WebSocket  — instant push from Appwrite when the Go function
-///      updates the financials document after Safaricom's callback.
-///
-///   2. Polling fallback    — queries Appwrite every [pollInterval] for any
-///      financials rows that are still pending locally but may have been
-///      confirmed server-side. Catches cases where the Realtime socket was
-///      offline when the callback arrived.
-///
-/// Consumers listen to [confirmations] stream and refresh their UI on events.
-
+/// Watches Appwrite for M-PESA STK confirmations using Realtime and Polling.
 class MpesaListenerService {
-  static final MpesaListenerService instance =
-      MpesaListenerService._internal();
+  static final MpesaListenerService instance = MpesaListenerService._internal();
   MpesaListenerService._internal();
 
   static const Duration pollInterval = Duration(seconds: 30);
 
-  final _db     = LocalDb.instance;
-  final _client = AppwriteClient.instance;
+  final _db       = LocalDb.instance;
+  final _client   = AppwriteClient.instance;
 
-  // Public stream — UI layers subscribe to this
-  final _controller =
-      StreamController<MpesaConfirmation>.broadcast();
+  final _controller = StreamController<MpesaConfirmation>.broadcast();
   Stream<MpesaConfirmation> get confirmations => _controller.stream;
 
   RealtimeSubscription? _subscription;
@@ -56,8 +41,6 @@ class MpesaListenerService {
 
   // ── Lifecycle ──────────────────────────────────────────────────────────────
 
-  /// Call once after AppwriteClient.init() and login — typically in AuthGate
-  /// after _onUnlocked(), so we have a valid session before subscribing.
   void start() {
     if (_started) return;
     _started = true;
@@ -87,29 +70,27 @@ class MpesaListenerService {
     return !results.contains(ConnectivityResult.none);
   }
 
-  // ── Strategy 1: Appwrite Realtime ──────────────────────────────────────────
+  // ── Strategy 1: Appwrite Realtime (UPDATED FOR 1.8.0) ──────────────────────
 
   void _subscribeRealtime() {
     try {
       final realtime = AppwriteClient.instance.realtime;
 
-      // Subscribe to any update on the financials collection.
-      // We filter to relevant events in the handler.
+      // MIGRATION: The channel string must use 'tables' and 'rows' instead of 
+      // 'collections' and 'documents' to match the 1.8.0+ server events.
       _subscription = realtime.subscribe([
         'databases.${AppwriteClient.kDatabaseId}'
-        '.collections.${AppwriteClient.colFinancials}'
-        '.documents',
+        '.tables.${AppwriteClient.colFinancials}'
+        '.rows',
       ]);
 
       _subscription!.stream.listen(
         _onRealtimeEvent,
         onError: (e) {
-          Log.e('[MpesaListener] Realtime error: $e — polling will cover.');
-          // Don't rethrow — polling is the safety net
+          Log.e('[MpesaListener] Realtime error: $e');
         },
         onDone: () {
           Log.i('[MpesaListener] Realtime socket closed — reconnecting.');
-          // Re-subscribe after a short delay
           Future.delayed(const Duration(seconds: 5), () {
             if (_started) _subscribeRealtime();
           });
@@ -117,68 +98,58 @@ class MpesaListenerService {
         cancelOnError: false,
       );
 
-      Log.i('[MpesaListener] Realtime subscribed to financials.');
+      Log.i('[MpesaListener] Realtime subscribed to financials table.');
     } catch (e) {
       Log.e('[MpesaListener] Realtime subscribe failed: $e');
     }
   }
 
   void _onRealtimeEvent(RealtimeMessage message) {
-    // Only care about update events (not create/delete)
-    final events = message.events;
-    final isUpdate = events.any((e) => e.contains('.update'));
+    // Only care about update events
+    final isUpdate = message.events.any((e) => e.contains('.update'));
     if (!isUpdate) return;
 
     final payload = message.payload;
     final status  = payload['payment_status'] as String?;
 
-    // Only act when Appwrite says paid
     if (status != 'paid') return;
 
-    final txnId  = payload['transaction_id'] as String?;
+    final txnId   = payload['transaction_id'] as String?;
     final receipt = payload['mpesa_receipt'] as String?;
     final amount  = (payload['amount'] as num?)?.toDouble();
 
     if (txnId == null || receipt == null || amount == null) return;
 
-    // Only handle records owned by the current user
-    final createdBy = payload['created_by'] as String?;
-    if (createdBy != SessionManager.instance.currentUserId) return;
+    // Check ownership
+    if (payload['created_by'] != SessionManager.instance.currentUserId) return;
 
-    Log.i('[MpesaListener] Realtime confirmed: $txnId receipt: $receipt');
+    Log.i('[MpesaListener] Realtime confirmed: $txnId');
     _applyConfirmation(txnId, receipt, amount);
   }
 
-  // ── Strategy 2: Polling fallback ───────────────────────────────────────────
+  // ── Strategy 2: Polling fallback (UPDATED FOR 1.8.0) ───────────────────────
 
   void _startPolling() {
     _pollTimer = Timer.periodic(pollInterval, (_) => _pollPending());
-    // Also poll immediately on start to catch anything missed while offline
     _pollPending();
   }
 
   Future<void> _pollPending() async {
-    if (!await _isOnline()) {
-      Log.i('[MpesaListener] Offline — skipping poll.');
-      return;
-    }
+    if (!await _isOnline()) return;
+    
     try {
       final db = await _db.database;
 
-      // Find all local financials that are still pending and have a
-      // checkout_request_id (i.e. an STK Push was sent for them)
       final rows = await db.query(
         'financials',
-        columns: ['transaction_id', 'checkout_request_id', 'amount'],
+        columns: ['transaction_id', 'amount'],
         where: "payment_status = 'pending' "
-            "AND checkout_request_id IS NOT NULL "
-            "AND created_by = ?",
+               "AND checkout_request_id IS NOT NULL "
+               "AND created_by = ?",
         whereArgs: [SessionManager.instance.currentUserId],
       );
 
       if (rows.isEmpty) return;
-
-      Log.i('[MpesaListener] Polling ${rows.length} pending STK transaction(s).');
 
       for (final row in rows) {
         final txnId = row['transaction_id'] as String;
@@ -192,24 +163,22 @@ class MpesaListenerService {
 
   Future<void> _fetchAndApply(String transactionId, double amount) async {
     try {
-      final doc = await _client.databases.getDocument(
+      // MIGRATION: getRow replaces getDocument
+      final row = await _client.tablesDB.getRow(
         databaseId:   AppwriteClient.kDatabaseId,
-        collectionId: AppwriteClient.colFinancials,
-        documentId:   transactionId,
+        tableId:      AppwriteClient.colFinancials,
+        rowId:        transactionId,
       );
 
-      final status  = doc.data['payment_status'] as String?;
-      final receipt = doc.data['mpesa_receipt']  as String?;
+      final status  = row.data['payment_status'] as String?;
+      final receipt = row.data['mpesa_receipt']  as String?;
 
       if (status == 'paid' && receipt != null && receipt.isNotEmpty) {
-        Log.i('[MpesaListener] Poll confirmed: $transactionId receipt: $receipt');
+        Log.i('[MpesaListener] Poll confirmed: $transactionId');
         _applyConfirmation(transactionId, receipt, amount);
       }
     } on AppwriteException catch (e) {
-      if (e.code == 404) {
-        // Document not yet synced to Appwrite — normal, skip silently
-        return;
-      }
+      if (e.code == 404) return;
       Log.e('[MpesaListener] Fetch error for $transactionId: ${e.message}');
     } catch (e) {
       Log.e('[MpesaListener] Unexpected fetch error: $e');
@@ -223,7 +192,6 @@ class MpesaListenerService {
     try {
       final db = await _db.database;
 
-      // Guard: don't write twice if both Realtime and poll fire for same txn
       final check = await db.query(
         'financials',
         columns: ['payment_status'],
@@ -231,14 +199,10 @@ class MpesaListenerService {
         whereArgs: [transactionId],
         limit: 1,
       );
-      if (check.isEmpty) return;
-      if (check.first['payment_status'] == 'paid') {
-        Log.i('[MpesaListener] $transactionId already confirmed — skipping.');
-        return;
-      }
+      
+      if (check.isEmpty || check.first['payment_status'] == 'paid') return;
 
       await db.transaction((txn) async {
-        // 1. Mark financial as paid
         await txn.update(
           'financials',
           {
@@ -250,9 +214,7 @@ class MpesaListenerService {
           whereArgs: [transactionId],
         );
 
-        // 2. Re-queue the financial so the updated row syncs back to Appwrite
-        //    (in case the Go function only updated Appwrite directly and the
-        //     local record was never updated before this write)
+        // Re-queue for local sync pass
         await _db.addToQueue(
           txn,
           recordId:  transactionId,
@@ -261,9 +223,6 @@ class MpesaListenerService {
         );
       });
 
-      Log.i('[MpesaListener] Applied confirmation for $transactionId.');
-
-      // Notify UI listeners
       _controller.add(MpesaConfirmation(
         transactionId: transactionId,
         mpesaReceipt:  mpesaReceipt,
