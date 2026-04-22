@@ -6,18 +6,17 @@ class AppwriteClient {
   static final AppwriteClient instance = AppwriteClient._internal();
   AppwriteClient._internal();
 
-  late final Client client; // Renamed from _client so AuthService can access it
-  late final Databases databases;
-  late final Account account; // ADDED BACK: Crucial for your LoginScreen to work!
+  late final Client client;
+  late final TablesDB tablesDB; // Switched from Databases to TablesDB
+  late final Account account; 
   late final Functions functions;
   late final Realtime realtime;
 
-  // ── Replace these with your Appwrite project values ──────────────────────
   static const _endpoint      = Secrets.appwriteEndpoint;
-  static const kProjectId      = Secrets.appwriteProjectId;
-  static const kDatabaseId      = Secrets.appwriteDatabaseId;
+  static const kProjectId     = Secrets.appwriteProjectId;
+  static const kDatabaseId    = Secrets.appwriteDatabaseId;
 
-  // Collection IDs (must match Appwrite console)
+  // Collection (Table) IDs
   static const colLedger          = 'ledger_entries';
   static const colAssets          = 'assets';
   static const colInventory       = 'inventory';
@@ -27,68 +26,51 @@ class AppwriteClient {
   static const colPartialPayments = 'partial_payments';
   static const colSyncConflicts   = 'sync_conflicts';
   static const colFlockLogs       = 'flock_logs';
+  static const colAssetImages     = 'asset_images';
 
   // Storage bucket IDs
   static const bucketAssetImages  = Secrets.bucketAssetImages;
-
-  // asset_images Appwrite collection ID (metadata — separate from the Storage bucket)
-  static const colAssetImages     = 'asset_images';
 
   void init() {
     client = Client()
       ..setEndpoint(_endpoint)
       ..setProject(kProjectId);
 
-    databases = Databases(client);
+    // Initialize the new TablesDB service
+    tablesDB  = TablesDB(client);
     account   = Account(client);
     functions = Functions(client);
     realtime  = Realtime(client);
   }
 
-  /// Push a single record to Appwrite. 
-  /// Throws an exception if the network fails so the local DB keeps the data queued.
+  /// Push a single record to Appwrite using the modern Upsert API.
+  /// This replaces the manual "update-then-create" logic.
   Future<void> upsertDocument({
     required String collectionId,
     required String documentId,
     required Map<String, dynamic> data,
   }) async {
     try {
-      // 1. Attempt to update the existing document.
-      // Appwrite only updates the specific fields provided in the 'data' map,
-      // preventing you from accidentally wiping out other fields changed by other users.
-      await databases.updateDocument(
+      // The new upsertRow handles both creation and updates in one network call.
+      // If the row exists, it updates; if not, it creates.
+      await tablesDB.upsertRow(
         databaseId: kDatabaseId,
-        collectionId: collectionId,
-        documentId: documentId,
+        tableId: collectionId, // In 1.8+, collectionId maps to tableId
+        rowId: documentId,     // In 1.8+, documentId maps to rowId
         data: data,
       );
-      Log.i('[Appwrite] Updated document: $documentId');
+
+      Log.i('[Appwrite] Successfully upserted row: $documentId');
       
     } on AppwriteException catch (e) {
-      if (e.code == 404) {
-        // 2. Document does not exist on the server. Safe to create.
-        try {
-          await databases.createDocument(
-            databaseId: kDatabaseId,
-            collectionId: collectionId,
-            documentId: documentId,
-            data: data,
-          );
-          Log.i('[Appwrite] Created new document: $documentId');
-        } on AppwriteException catch (createError) {
-          // CRITICAL: If the network drops exactly here, we MUST rethrow 
-          // so the SyncService doesn't mark it as 'synced'.
-          Log.e('[Appwrite] Create failed: ${createError.message}');
-          rethrow; 
-        }
-      } else {
-        // 3. Network timeout (code 0), Rate Limit (429), or Permission Error (401/403)
-        Log.e('[Appwrite] Update failed: ${e.message}');
-        rethrow; // CRITICAL: Keep it in the SQLite queue!
-      }
+      // We no longer need to check for code 404 manually!
+      // We only catch real errors: Network (0), Rate Limits (429), or Permissions (401).
+      Log.e('[Appwrite] Upsert failed: ${e.message} (Code: ${e.code})');
+      
+      // CRITICAL: Rethrow so the SyncService knows to keep this in the SQLite queue.
+      rethrow; 
     } catch (e) {
-      // Catch-all for formatting errors or unexpected crashes
-      Log.e('[Appwrite] Fatal upsert error: $e');
+      Log.e('[Appwrite] Unexpected fatal error during upsert: $e');
       rethrow;
     }
   }

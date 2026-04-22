@@ -5,20 +5,21 @@ import '../core/appwrite_client.dart';
 import '../core/local_db.dart';
 import 'image_service.dart';
 
-/// Handles the Appwrite Storage side of image sync:
-///   - Uploads pending images from asset_images table
-///   - Deletes files from Appwrite Storage when queued for DELETE
-///   - Called by SyncService during its normal sync pass
+/// Handles the Appwrite Storage side of image sync.
 class ImageSyncService {
   static final ImageSyncService instance = ImageSyncService._();
   ImageSyncService._();
 
-  static const _bucketId = AppwriteClient.bucketAssetImages; // Appwrite Storage bucket ID
+  static const _bucketId = AppwriteClient.bucketAssetImages;
+
+  // Initialize storage once
+  late final Storage _storage = Storage(AppwriteClient.instance.client);
+  // Shortcut to the new TablesDB service
+  late final TablesDB _tablesDB = AppwriteClient.instance.tablesDB;
 
   // ── Upload pending images ──────────────────────────────────────────────────
 
   /// Upload all images with upload_status = 'pending' that have a local file.
-  /// Safe to call multiple times — skips already-uploaded rows.
   Future<void> uploadPending() async {
     final db = await LocalDb.instance.database;
 
@@ -30,12 +31,10 @@ class ImageSyncService {
     if (pending.isEmpty) return;
     Log.i('[ImageSync] ${pending.length} images pending upload.');
 
-    final storage = Storage(AppwriteClient.instance.client);
-
     for (final row in pending) {
       final imageId   = row['image_id'] as String;
       final localPath = row['local_path'] as String;
-      final file      = File(localPath);
+      final file       = File(localPath);
 
       if (!await file.exists()) {
         Log.w('[ImageSync] Cache file missing for $imageId — skipping.');
@@ -43,9 +42,9 @@ class ImageSyncService {
       }
 
       try {
-        final result = await storage.createFile(
+        final result = await _storage.createFile(
           bucketId: _bucketId,
-          fileId:   imageId, // use imageId as Appwrite file ID for 1:1 mapping
+          fileId:   imageId, 
           file:     InputFile.fromPath(
             path:     localPath,
             filename: '$imageId.jpg',
@@ -56,18 +55,19 @@ class ImageSyncService {
         );
 
         await ImageService.instance.markUploaded(imageId, result.$id);
-        // Push metadata to DB collection so other devices can down-sync it
+        
+        // Push metadata to DB table so other devices can down-sync it
         await _pushMetadata(row, result.$id);
+        
         Log.i('[ImageSync] Uploaded $imageId → ${result.$id}');
       } on AppwriteException catch (e) {
-        // 409 = file already exists in Appwrite (e.g. re-run after crash)
         if (e.code == 409) {
+          // File already exists in storage, just fix the metadata and local state
           await ImageService.instance.markUploaded(imageId, imageId);
           await _pushMetadata(row, imageId);
-          Log.w('[ImageSync] $imageId already exists in Appwrite — marked uploaded.');
+          Log.w('[ImageSync] $imageId already exists in Storage — recovery successful.');
         } else {
           Log.e('[ImageSync] Upload failed for $imageId: ${e.message}');
-          // Will retry on next sync pass
         }
       } catch (e) {
         Log.e('[ImageSync] Unexpected error for $imageId: $e');
@@ -75,66 +75,47 @@ class ImageSyncService {
     }
   }
 
-  /// Push image metadata to the asset_images Appwrite Database collection.
-  /// This is what lets other devices down-sync the image reference.
+  /// Push image metadata to the asset_images Appwrite Database table.
+  /// Refactored to use native upsertRow.
   Future<void> _pushMetadata(Map<String, dynamic> row, String appwriteFileId) async {
+    final imageId = row['image_id'] as String;
+    
     try {
-      final databases = AppwriteClient.instance.databases;
-      final imageId   = row['image_id'] as String;
-      // Upsert pattern — try update first, create on 404
-      try {
-        await databases.updateDocument(
-          databaseId:   AppwriteClient.kDatabaseId,
-          collectionId: AppwriteClient.colAssetImages,
-          documentId:   imageId,
-          data: {
-            'appwrite_file_id': appwriteFileId,
-            'upload_status':    'uploaded',
-          },
-        );
-      } on AppwriteException catch (e) {
-        if (e.code == 404) {
-          await databases.createDocument(
-            databaseId:   AppwriteClient.kDatabaseId,
-            collectionId: AppwriteClient.colAssetImages,
-            documentId:   imageId,
-            data: {
-              'image_id':         imageId,
-              'entity_type':      row['entity_type'],
-              'entity_id':        row['entity_id'],
-              'sort_order':       row['sort_order'],
-              'appwrite_file_id': appwriteFileId,
-              'upload_status':    'uploaded',
-              'cached_until':     row['cached_until'],
-              'created_by':       row['created_by'],
-              'created_at':       row['created_at'],
-            },
-          );
-        } else {
-          rethrow;
-        }
-      }
+      // Streamlined: upsertRow handles both the initial creation and any subsequent updates.
+      await _tablesDB.upsertRow(
+        databaseId: AppwriteClient.kDatabaseId,
+        tableId:    AppwriteClient.colAssetImages,
+        rowId:      imageId,
+        data: {
+          'image_id':         imageId,
+          'entity_type':      row['entity_type'],
+          'entity_id':        row['entity_id'],
+          'sort_order':       row['sort_order'],
+          'appwrite_file_id': appwriteFileId,
+          'upload_status':    'uploaded',
+          'cached_until':     row['cached_until'],
+          'created_by':       row['created_by'],
+          'created_at':       row['created_at'],
+        },
+      );
+      
       Log.i('[ImageSync] Metadata pushed for $imageId');
     } catch (e) {
-      // Non-fatal — Storage upload succeeded, metadata push can retry
-      Log.e('[ImageSync] Metadata push failed for ${row['image_id']}: $e');
+      // Non-fatal — Storage upload succeeded, metadata push will retry on next sync pass
+      Log.e('[ImageSync] Metadata push failed for $imageId: $e');
     }
   }
 
   // ── Delete from Appwrite ───────────────────────────────────────────────────
 
-  /// Delete a file from Appwrite Storage by its file ID.
-  /// Called by SyncService when it processes a DELETE from the sync_queue
-  /// for table 'asset_images'.
+  /// Delete a file from Appwrite Storage.
   Future<void> deleteFile(String appwriteFileId) async {
     try {
-      final storage = Storage(AppwriteClient.instance.client);
-      await storage.deleteFile(bucketId: _bucketId, fileId: appwriteFileId);
+      await _storage.deleteFile(bucketId: _bucketId, fileId: appwriteFileId);
       Log.i('[ImageSync] Deleted $appwriteFileId from Appwrite Storage.');
     } on AppwriteException catch (e) {
-      // 404 = already gone, treat as success
       if (e.code == 404) {
-        Log.w('[ImageSync] $appwriteFileId not found in Appwrite — already deleted.');
+        Log.w('[ImageSync] $appwriteFileId not found — already deleted.');
       } else {
         Log.e('[ImageSync] Delete failed for $appwriteFileId: ${e.message}');
         rethrow;
@@ -145,15 +126,15 @@ class ImageSyncService {
   // ── Download for cache refresh ─────────────────────────────────────────────
 
   /// Fetch image bytes from Appwrite and refresh local cache.
-  /// Call when FarmImage.localPath is null but appwriteFileId is set.
   Future<String?> fetchAndRecache(FarmImage image) async {
     if (image.appwriteFileId == null) return null;
+    
     try {
-      final storage = Storage(AppwriteClient.instance.client);
-      final bytes   = await storage.getFileDownload(
+      final bytes = await _storage.getFileDownload(
         bucketId: _bucketId,
         fileId:   image.appwriteFileId!,
       );
+      
       return await ImageService.instance.recache(
         imageId:        image.imageId,
         appwriteFileId: image.appwriteFileId!,
@@ -165,11 +146,11 @@ class ImageSyncService {
     }
   }
 
-  /// Build the Appwrite preview URL for an image (no download needed for display).
-  /// Use this for fast in-app display when you have a valid session.
+  /// Build the Appwrite preview URL for an image.
   String previewUrl(String appwriteFileId, {int width = 1080}) {
     final endpoint  = AppwriteClient.instance.client.endPoint;
     final projectId = AppwriteClient.kProjectId;
+    
     return '$endpoint/storage/buckets/$_bucketId/files/$appwriteFileId/preview'
         '?width=$width&project=$projectId';
   }

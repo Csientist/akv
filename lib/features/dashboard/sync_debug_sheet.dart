@@ -162,7 +162,7 @@ class _QueueTab extends StatelessWidget {
   }
 }
 
-// ── Conflicts Tab ─────────────────────────────────────────────────────────────
+// ── Conflicts Tab (REFACORED FOR 1.8.0) ───────────────────────────────────────
 
 class _ConflictsTab extends StatefulWidget {
   const _ConflictsTab();
@@ -182,17 +182,19 @@ class _ConflictsTabState extends State<_ConflictsTab> {
 
   Future<List<Map<String, dynamic>>> _fetchConflicts() async {
     try {
-      final result = await AppwriteClient.instance.databases.listDocuments(
+      // MIGRATION: listRows replaces listDocuments
+      final result = await AppwriteClient.instance.tablesDB.listRows(
         databaseId:   AppwriteClient.kDatabaseId,
-        collectionId: AppwriteClient.colSyncConflicts,
+        tableId:      AppwriteClient.colSyncConflicts,
         queries: [
           Query.orderDesc('conflict_at'),
           Query.limit(50),
         ],
       );
-      // Keep $id alongside data so we can delete individual docs
-      return result.documents
-          .map((d) => {...d.data, '\$id': d.$id})
+      
+      // result.rows replaces result.documents
+      return result.rows
+          .map((row) => {...row.data, '\$id': row.$id})
           .toList();
     } on AppwriteException catch (e) {
       if (e.code == 404) return [];
@@ -200,25 +202,26 @@ class _ConflictsTabState extends State<_ConflictsTab> {
     }
   }
 
-  Future<void> _deleteOne(String docId) async {
+  Future<void> _deleteOne(String rowId) async {
     try {
-      await AppwriteClient.instance.databases.deleteDocument(
+      // MIGRATION: deleteRow replaces deleteDocument
+      await AppwriteClient.instance.tablesDB.deleteRow(
         databaseId:   AppwriteClient.kDatabaseId,
-        collectionId: AppwriteClient.colSyncConflicts,
-        documentId:   docId,
+        tableId:      AppwriteClient.colSyncConflicts,
+        rowId:        rowId,
       );
     } catch (_) {}
     setState(() => _future = _fetchConflicts());
   }
 
-  Future<void> _clearAll(List<Map<String, dynamic>> docs) async {
+  Future<void> _clearAll(List<Map<String, dynamic>> rows) async {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
         title: const Text('Clear all conflicts?'),
         content: Text(
-            'Permanently delete ${docs.length} '
-            'conflict record${docs.length > 1 ? 's' : ''} from Appwrite.'),
+            'Permanently delete ${rows.length} '
+            'conflict record${rows.length > 1 ? 's' : ''} from Appwrite.'),
         actions: [
           TextButton(
               onPressed: () => Navigator.pop(context, false),
@@ -232,13 +235,14 @@ class _ConflictsTabState extends State<_ConflictsTab> {
       ),
     );
     if (confirmed != true) return;
-    for (final doc in docs) {
-      final id = (doc['\$id'] ?? doc['conflict_id']) as String;
+    
+    for (final row in rows) {
+      final id = (row['\$id'] ?? row['conflict_id']) as String;
       try {
-        await AppwriteClient.instance.databases.deleteDocument(
+        await AppwriteClient.instance.tablesDB.deleteRow(
           databaseId:   AppwriteClient.kDatabaseId,
-          collectionId: AppwriteClient.colSyncConflicts,
-          documentId:   id,
+          tableId:      AppwriteClient.colSyncConflicts,
+          rowId:        id,
         );
       } catch (_) {}
     }
@@ -278,7 +282,6 @@ class _ConflictsTabState extends State<_ConflictsTab> {
           );
         }
         return Column(children: [
-          // Clear all button
           Padding(
             padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
             child: Row(children: [
@@ -382,7 +385,6 @@ class _ConflictDetailSheet extends StatelessWidget {
     final recordId = doc['record_id']   as String? ?? '';
     final at       = doc['conflict_at'] as String? ?? '';
 
-    // diff_json is a JSON-encoded map of { fieldName: '{"local":x,"remote":y}' }
     Map<String, dynamic> diff = {};
     try {
       final raw = doc['diff_json'] as String?;
@@ -571,7 +573,6 @@ class _DbInspectorTabState extends State<_DbInspectorTab> {
     final db  = await LocalDb.instance.database;
     final uid = SessionManager.instance.currentUserId;
 
-    // Row counts — all rows and rows belonging to this user
     Future<int> count(String table, {bool myRows = false}) async {
       final where = myRows ? 'WHERE created_by = ?' : '';
       final args  = myRows ? [uid] : [];
@@ -593,8 +594,6 @@ class _DbInspectorTabState extends State<_DbInspectorTab> {
       );
     }
 
-    // Sample last 8 financials — all rows, ignoring created_by filter
-    // so we can see if data is there but under a different user ID
     final rows = await db.query(
       'financials',
       orderBy: 'created_at DESC',
@@ -624,14 +623,11 @@ class _DbInspectorTabState extends State<_DbInspectorTab> {
         return ListView(
           padding: const EdgeInsets.all(12),
           children: [
-            // Current user ID
             _InspectorSection(
               label: 'SESSION',
               child: _MonoRow('User ID', s.userId),
             ),
             const SizedBox(height: 12),
-
-            // Table counts
             _InspectorSection(
               label: 'TABLE COUNTS  (total / mine)',
               child: Column(
@@ -661,8 +657,6 @@ class _DbInspectorTabState extends State<_DbInspectorTab> {
               ),
             ),
             const SizedBox(height: 12),
-
-            // Recent financials sample (ignores created_by filter)
             _InspectorSection(
               label: 'RECENT FINANCIALS (ALL USERS)',
               child: s.recentFinancials.isEmpty

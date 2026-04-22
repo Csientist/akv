@@ -1,5 +1,4 @@
 import 'package:appwrite/appwrite.dart';
-
 import '../core/logger.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import '../core/local_db.dart';
@@ -13,10 +12,8 @@ class SyncService {
   final LocalDb _db;
   final AppwriteClient _remote;
 
-  // Static lock — SyncService() is instantiated fresh each call site,
-  // so an instance-level bool was never actually guarding anything.
+  // Static lock to prevent multiple sync loops from overlapping
   static bool _isSyncing = false;
-
   static const int _maxRetries = 5;
 
   SyncService({LocalDb? db, AppwriteClient? remote})
@@ -32,7 +29,6 @@ class SyncService {
   }
 
   /// Full bidirectional sync: push local changes first, then pull remote.
-  /// Call this on login/unlock and on AppRefreshService ticks.
   Future<void> fullSync() async {
     if (_isSyncing) return;
     await _runSyncLoop();
@@ -42,15 +38,14 @@ class SyncService {
     // Gate 1: Connectivity
     final connectivityResults = await Connectivity().checkConnectivity();
     if (connectivityResults.contains(ConnectivityResult.none)) {
-      Log.w('[Sync] Offline — will retry when connected.');
+      Log.w('[Sync] Offline — skipping sync loop.');
       return;
     }
 
-    // Gate 2: Must have a valid Appwrite session before pushing anything.
-    // Without this, every record would get a 401 and burn through retries.
+    // Gate 2: Session Check
     final hasSession = await PinService.instance.hasSession();
     if (!hasSession) {
-      Log.w('[Sync] No Appwrite session — skipping until user logs in.');
+      Log.w('[Sync] No Appwrite session — skipping up-sync.');
       return;
     }
 
@@ -61,27 +56,24 @@ class SyncService {
       final queue = await _db.getPendingQueue();
 
       if (queue.isNotEmpty) {
-        Log.i('[Sync] ${queue.length} item(s) to sync.');
+        Log.i('[Sync] ${queue.length} item(s) to push.');
         for (final item in queue) {
           await _syncItem(item);
         }
-        // Upload pending image files to Appwrite Storage
+        // Upload image files to Storage
         await ImageSyncService.instance.uploadPending();
-      } else {
-        Log.i('[Sync] Up-sync queue empty.');
       }
 
-      // ── Down-sync: pull remote changes into local SQLite ──────────────────
-      // Always runs — even on fresh install with empty queue.
-      // Runs after up-sync so we don't overwrite our own just-pushed records.
+      // ── Down-sync: pull remote changes ────────────────────────────────────
       final userId = SessionManager.instance.isLoggedIn
           ? SessionManager.instance.currentUserId
           : null;
+      
       if (userId != null) {
         await DownSyncService.instance.pullAll(userId);
       }
     } catch (e, stackTrace) {
-      Log.e('[Sync] Fatal error in sync loop: $e\n$stackTrace');
+      Log.e('[Sync] Fatal sync error: $e\n$stackTrace');
     } finally {
       _isSyncing = false;
       Log.i('[Sync] Sync loop complete.');
@@ -94,36 +86,40 @@ class SyncService {
     final tableName  = queueRow['table_name'] as String;
     final retryCount = (queueRow['retry_count'] as int?) ?? 0;
 
-    // Poison pill defence
+    // Poison pill defense
     if (retryCount >= _maxRetries) {
-      Log.e('[Sync] 🛑 Item $queueId exceeded max retries. Marking as failed.');
+      Log.e('[Sync] 🛑 Item $queueId ($tableName) failed max retries.');
       await _db.updateQueueStatus(queueId, 'failed');
       return;
     }
 
-    // asset_images: DELETE removes both the Storage file and the DB metadata doc.
+    // Special Case: asset_images DELETE
     if (tableName == 'asset_images') {
       try {
+        // 1. Remove file from Storage
         await ImageSyncService.instance.deleteFile(recordId);
-        // Also delete the metadata document from the Database collection
+        
+        // 2. Remove metadata row from the Table
         try {
-          await _remote.databases.deleteDocument(
-            databaseId:   AppwriteClient.kDatabaseId,
-            collectionId: AppwriteClient.colAssetImages,
-            documentId:   recordId,
+          await _remote.tablesDB.deleteRow(
+            databaseId: AppwriteClient.kDatabaseId,
+            tableId:    AppwriteClient.colAssetImages,
+            rowId:      recordId,
           );
         } on AppwriteException catch (e) {
-          if (e.code != 404) rethrow; // 404 = already gone, fine
+          if (e.code != 404) rethrow; // 404 means already deleted on server, which is a win
         }
+        
         await _db.removeFromQueue(queueId);
-        Log.i('[Sync] ✓ Deleted image $recordId (Storage + DB)');
+        Log.i('[Sync] ✓ Deleted image $recordId');
       } catch (e) {
         await _db.markQueueRetry(queueId, retryCount);
-        Log.e('[Sync] ✗ Failed to delete image $recordId: $e');
+        Log.e('[Sync] ✗ Image delete failed: $e');
       }
       return;
     }
 
+    // Standard Case: Upsert (Update or Create)
     try {
       final db = await _db.database;
       final rows = await db.query(
@@ -134,19 +130,20 @@ class SyncService {
       );
 
       if (rows.isEmpty) {
-        Log.w('[Sync] $recordId missing in $tableName — dropping from queue.');
+        Log.w('[Sync] $recordId missing locally — dropping from queue.');
         await _db.removeFromQueue(queueId);
         return;
       }
 
-      final rawData      = Map<String, dynamic>.from(rows.first);
-      final collectionId = _tableToCollection(tableName);
-      final sanitized    = _sanitizeForAppwrite(rawData, tableName);
+      final rawData  = Map<String, dynamic>.from(rows.first);
+      final tableId  = _tableToId(tableName);
+      final sanitized = _sanitizeForAppwrite(rawData, tableName);
 
+      // MIGRATION: Uses the refactored native upsertRow under the hood
       await _remote.upsertDocument(
-        collectionId: collectionId,
-        documentId: recordId,
-        data: sanitized,
+        collectionId: tableId,
+        documentId:   recordId,
+        data:         sanitized,
       );
 
       await _db.removeFromQueue(queueId);
@@ -154,14 +151,13 @@ class SyncService {
 
     } catch (e) {
       await _db.markQueueRetry(queueId, retryCount);
-      Log.e('[Sync] ✗ Failed $tableName/$recordId '
-          '(attempt ${retryCount + 1}/$_maxRetries): $e');
+      Log.e('[Sync] ✗ Failed $tableName/$recordId (Attempt ${retryCount + 1}): $e');
     }
   }
 
-  // ── Table routing ──────────────────────────────────────────────────────────
+  // ── Table Routing ──────────────────────────────────────────────────────────
 
-  String _tableToCollection(String tableName) {
+  String _tableToId(String tableName) {
     switch (tableName) {
       case 'ledger_entries': return AppwriteClient.colLedger;
       case 'assets':         return AppwriteClient.colAssets;
@@ -183,50 +179,36 @@ class SyncService {
       case 'asset_events':   return 'event_id = ?';
       case 'milk_logs':      return 'log_id = ?';
       case 'partial_payments': return 'payment_id = ?';
-      default: throw Exception('[Sync] Unknown table: $tableName');
+      default: throw Exception('[Sync] Unknown PK for: $tableName');
     }
   }
 
   // ── Sanitization ───────────────────────────────────────────────────────────
 
-  Map<String, dynamic> _sanitizeForAppwrite(
-      Map<String, dynamic> data, String tableName) {
+  Map<String, dynamic> _sanitizeForAppwrite(Map<String, dynamic> data, String tableName) {
     final out = <String, dynamic>{};
 
     for (final entry in data.entries) {
       final key = entry.key;
       var   val = entry.value;
 
-      // Strip SQLite-internal fields Appwrite doesn't want in the document body
       if (key == 'id' || key == 'queue_id') continue;
 
-      // SQLite stores booleans as 0/1 integers — Appwrite needs true/false
       if (key == 'is_kra_certified') {
-        val = val == 1;
-        out[key] = val;
+        out[key] = val == 1;
         continue;
       }
 
-      // ── metadata / notes fields ───────────────────────────────────────────
-      // Appwrite stores these as String (not JSON object) because Appwrite's
-      // free-tier doesn't support arbitrary nested JSON attributes.
-      // SQLite already stores them as JSON strings, so we pass them through
-      // as-is. Null stays null — don't send empty strings for nullable fields.
       if (key == 'metadata') {
         if (val != null && val.toString().isNotEmpty) {
-          out[key] = val.toString(); // guaranteed to be the raw JSON string
+          out[key] = val.toString(); 
         }
-        // Skip entirely if null — avoids Appwrite rejecting null on non-nullable schema
         continue;
       }
 
-      // Nulls on optional fields: skip rather than sending null, which can
-      // cause Appwrite schema validation errors on required-field mismatch
       if (val == null) continue;
-
       out[key] = val;
     }
-
     return out;
   }
 
@@ -235,10 +217,8 @@ class SyncService {
   void listenForConnectivity() {
     Connectivity().onConnectivityChanged.listen((List<ConnectivityResult> results) {
       if (!results.contains(ConnectivityResult.none)) {
-        Log.i('[Sync] Network restored — triggering full sync.');
-        // Full bidirectional sync: push queued writes AND pull any records
-        // another device pushed while we were offline.
-        SyncService().fullSync();
+        Log.i('[Sync] Network restored — triggering sync.');
+        fullSync();
       }
     });
   }

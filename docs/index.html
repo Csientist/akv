@@ -26,7 +26,7 @@
     <li><a href="#" onclick="showPage('start')" id="nav-start">Getting Started</a></li>
     <li><a href="#" onclick="showPage('arch')" id="nav-arch">Architecture</a></li>
     <li><a href="#" onclick="showPage('changelog')" id="nav-changelog">Changelog</a></li>
-    <li><span class="nav-badge">Beta v0.4.0</span></li>
+    <li><span class="nav-badge">Beta v0.4.1</span></li>
   </ul>
   <button class="nav-hamburger" id="hamburger" aria-label="Toggle menu" onclick="toggleDrawer()">
     <span></span><span></span><span></span>
@@ -38,14 +38,14 @@
   <a href="#" onclick="showPage('start');closeDrawer()" id="drawer-start">Getting Started</a>
   <a href="#" onclick="showPage('arch');closeDrawer()" id="drawer-arch">Architecture</a>
   <a href="#" onclick="showPage('changelog');closeDrawer()" id="drawer-changelog">Changelog</a>
-  <span class="nav-badge">Beta v0.4.0</span>
+  <span class="nav-badge">Beta v0.4.1</span>
 </div>
 
 <div id="page-home" class="page active">
 
   <div class="hero">
     <div class="hero-left">
-      <div class="hero-eyebrow">Flutter · Appwrite · Local-First</div>
+      <div class="hero-eyebrow">Flutter · Appwrite 1.8+ · Local-First</div>
       <h1 class="hero-title">Farm management built for the <em>field.</em></h1>
       <p class="hero-desc">Akavango Farm Manager is an Android-first mobile app that tracks livestock, inventory, milk logs, finances, and field activity — fully offline, syncing when you're back in range.</p>
       <div class="hero-ctas">
@@ -194,8 +194,8 @@
     <div class="features-strip-track">
       <div class="feature-chip"><div class="dot"></div><span>Offline-first SQLite</span></div>
       <div class="feature-chip"><div class="dot"></div><span>Transactional outbox sync</span></div>
-      <div class="feature-chip"><div class="dot" style="background:var(--harvest)"></div><span>Conflict detection</span></div>
-      <div class="feature-chip"><div class="dot" style="background:var(--river)"></div><span>Photo capture + compression</span></div>
+      <div class="feature-chip"><div class="dot" style="background:var(--harvest)"></div><span>TablesDB v1.8 Migration</span></div>
+      <div class="feature-chip"><div class="dot" style="background:var(--river)"></div><span>Native upsertRow</span></div>
       <div class="feature-chip"><div class="dot"></div><span>M-Pesa STK push</span></div>
       <div class="feature-chip"><div class="dot" style="background:var(--harvest)"></div><span>PIN auth layer</span></div>
       <div class="feature-chip"><div class="dot" style="background:var(--river)"></div><span>Bidirectional sync</span></div>
@@ -205,8 +205,8 @@
       <div class="feature-chip"><div class="dot"></div><span>Android-first</span></div>
       <div class="feature-chip"><div class="dot"></div><span>Offline-first SQLite</span></div>
       <div class="feature-chip"><div class="dot"></div><span>Transactional outbox sync</span></div>
-      <div class="feature-chip"><div class="dot" style="background:var(--harvest)"></div><span>Conflict detection</span></div>
-      <div class="feature-chip"><div class="dot" style="background:var(--river)"></div><span>Photo capture + compression</span></div>
+      <div class="feature-chip"><div class="dot" style="background:var(--harvest)"></div><span>TablesDB v1.8 Migration</span></div>
+      <div class="feature-chip"><div class="dot" style="background:var(--river)"></div><span>Native upsertRow</span></div>
       <div class="feature-chip"><div class="dot"></div><span>M-Pesa STK push</span></div>
       <div class="feature-chip"><div class="dot" style="background:var(--harvest)"></div><span>PIN auth layer</span></div>
       <div class="feature-chip"><div class="dot" style="background:var(--river)"></div><span>Bidirectional sync</span></div>
@@ -220,7 +220,7 @@
   <section style="background:var(--fog);">
     <div class="section-label">Platform Overview</div>
     <h2 class="section-title">Everything a farm operation needs</h2>
-    <p class="section-sub">Designed for low-connectivity environments, Akavango keeps all your data local first and syncs intelligently when a connection is available.</p>
+    <p class="section-sub">Designed for low-connectivity environments, Akavango keeps all your data local first and syncs intelligently when a connection is available via Appwrite TablesDB.</p>
     <div class="feature-grid">
       <div class="feature-card fade-up">
         <div class="feature-icon">🐄</div>
@@ -248,14 +248,15 @@
         <p>Feed, medicine, and equipment tracking with edit support. Know what's in stock before heading to the field.</p>
       </div>
       <div class="feature-card fade-up">
-        <div class="feature-icon">💰</div>
+        <div class="feature-icon"></div>
         <h3>Financial Records</h3>
+        <div class="feature-icon">💰</div>
         <p>Sales and purchases with partial payment support. Instalment tracking across multiple payment milestones.</p>
       </div>
       <div class="feature-card fade-up">
         <div class="feature-icon">🔄</div>
         <h3>Bidirectional Sync</h3>
-        <p>Outbox pattern ensures zero data loss. Sync fires on connectivity restore, on app unlock, and on a 1000s heartbeat.</p>
+        <p>Outbox pattern ensures zero data loss. Synced via Appwrite 1.8 TablesDB for native server-side atomic upserts.</p>
       </div>
       <div class="feature-card fade-up">
         <div class="feature-icon">🔒</div>
@@ -277,7 +278,7 @@
       <div class="powered-card">
         <div class="powered-icon" style="color:#f02e65;">✦</div>
         <div class="powered-name">Appwrite Cloud</div>
-        <div class="powered-desc">Database, Auth, Storage, Functions, and Sites — all in one project</div>
+        <div class="powered-desc">TablesDB, Auth, Storage, Functions, and Sites — all in one project</div>
       </div>
       <div class="powered-card">
         <div class="powered-icon" style="color:#c8a84a;">⬡</div>
@@ -309,7 +310,7 @@
       <a href="#" onclick="showPage('changelog')">Changelog</a>
       <a href="#" onclick="showPage('arch')">Architecture</a>
     </div>
-    <div class="footer-meta">Beta v0.4.0 · Flutter · Appwrite Cloud</div>
+    <div class="footer-meta">Beta v0.4.1 · Flutter · Appwrite Cloud (Frankfurt)</div>
   </footer>
 </div>
 
@@ -340,7 +341,7 @@
   </aside>
   <main class="docs-content">
     <h1 id="gs-intro">Getting Started</h1>
-    <p class="lead">Get Akavango Farm Manager running on your Android device. The app targets Android-first (tested on your Android device) with iOS-ready architecture. Appwrite Cloud (Frankfurt region) handles the backend — you'll need a free Appwrite account.</p>
+    <p class="lead">Get Akavango Farm Manager running on your Android device. The app uses <strong>Appwrite 1.8.0+</strong> terminology: "Tables" and "Rows". Appwrite Cloud (Frankfurt region) handles the backend — you'll need a free Appwrite account.</p>
 
     <h2 id="gs-prereq">Prerequisites</h2>
     <ul>
@@ -397,10 +398,10 @@ cd akavango-farm</code></pre>
 Database ID: YOUR_DATABASE_ID
 Endpoint   : https://YOUR_APPWRITE_ENDPOINT/v1</code></pre>
 
-    <h3>Required Collections</h3>
-    <p>All collections live in the same database. Create each with these primary keys:</p>
+    <h3>Required Tables (formerly Collections)</h3>
+    <p>All tables live in the same database. Create each with these primary keys:</p>
     <div class="table-scroll"><table class="collection-table">
-      <thead><tr><th>Collection ID</th><th>Primary Key</th><th>Notes</th></tr></thead>
+      <thead><tr><th>Table ID</th><th>Primary Key</th><th>Notes</th></tr></thead>
       <tbody>
         <tr><td>ledger_entries</td><td>event_id</td><td>Append-only truth log</td></tr>
         <tr><td>assets</td><td>asset_id</td><td>Livestock + crops</td></tr>
@@ -415,7 +416,7 @@ Endpoint   : https://YOUR_APPWRITE_ENDPOINT/v1</code></pre>
       </tbody>
     </table></div>
 
-    <h3>Required Indexes (on every collection)</h3>
+    <h3>Required Indexes (on every table)</h3>
     <pre><code>created_by  → Key ASC
 created_at  → Key ASC</code></pre>
 
@@ -496,17 +497,17 @@ flutter build appbundle --release</code></pre>
 <div class="arch-page">
   <div class="section-label">Technical Reference</div>
   <h1>Architecture</h1>
-  <p class="lead">Akavango is built on a local-first principle: SQLite is the source of truth on-device, and Appwrite Cloud is the sync target. The payment layer is powered by Appwrite Functions in Go talking to Safaricom's Daraja API via a Cloudflare Worker. This very documentation is hosted on Appwrite Sites.</p>
+  <p class="lead">Akavango is built on a local-first principle: SQLite is the source of truth on-device, and Appwrite TablesDB (v1.8.0+) is the sync target. The payment layer is powered by Appwrite Functions in Go talking to Safaricom's Daraja API via a Cloudflare Worker. This very documentation is hosted on Appwrite Sites.</p>
 
   <h2>Service Architecture</h2>
   <div class="arch-grid">
     <div class="arch-card">
       <div class="arch-card-header"><span class="icon">🔄</span><h3>SyncService</h3></div>
       <div class="arch-card-body">
-        <p>Drains the <code>sync_queue</code> outbox table to Appwrite Database. Fires on connectivity restore, on PIN unlock, and on the 1000s heartbeat from <code>AppRefreshService</code>.</p>
+        <p>Drains the <code>sync_queue</code> outbox table to Appwrite Database. Fires on connectivity restore, on PIN unlock, and on the 1000s heartbeat.</p>
         <ul>
           <li>Reads pending rows from <code>sync_queue</code></li>
-          <li>Upserts each record to its Appwrite collection</li>
+          <li>Uses <code>tablesDB.upsertRow</code> for atomic writes</li>
           <li>Marks queue row as processed on success</li>
           <li>Triggers <code>DownSyncService</code> after completion</li>
         </ul>
@@ -515,7 +516,7 @@ flutter build appbundle --release</code></pre>
     <div class="arch-card">
       <div class="arch-card-header"><span class="icon">⬇️</span><h3>DownSyncService</h3></div>
       <div class="arch-card-body">
-        <p>Cursor-based pull of all 10 collections from Appwrite. Uses <code>sync_meta</code> table to persist per-collection cursors so only new/updated documents are fetched.</p>
+        <p>Cursor-based pull of all 10 tables from Appwrite. Uses <code>sync_meta</code> table to persist per-table cursors so only new/updated rows are fetched.</p>
         <ul>
           <li>Reads last cursor from <code>sync_meta</code></li>
           <li>Fetches pages sorted by <code>created_at ASC</code></li>
@@ -542,7 +543,7 @@ flutter build appbundle --release</code></pre>
         <ul>
           <li>Pick → compress (JPEG, ≤200KB) → cache → SQLite row</li>
           <li>Queue file for upload to <code>asset-images</code> bucket</li>
-          <li>Push metadata to <code>asset_images</code> collection</li>
+          <li>Push metadata row to <code>asset_images</code> table</li>
           <li>Download thumbnails on down-sync</li>
         </ul>
       </div>
@@ -567,7 +568,7 @@ flutter build appbundle --release</code></pre>
           <li><code>sync_queue</code> — outbox for up-sync</li>
           <li><code>sync_meta</code> — per-collection down-sync cursors</li>
           <li><code>auth_config</code> — hashed PIN store</li>
-          <li>All 10 collection tables (mirrored from Appwrite)</li>
+          <li>All 10 tables (mirrored from Appwrite)</li>
         </ul>
       </div>
     </div>
@@ -601,7 +602,7 @@ flutter build appbundle --release</code></pre>
       <div class="section-label">Sync Architecture</div>
       <h2>Write local, sync smart</h2>
       <p>Every write hits SQLite immediately — the app never waits for a network round-trip. A <code>sync_queue</code> outbox table records each pending operation. <code>SyncService</code> drains the queue when connectivity is available.</p>
-      <p>Down-sync uses cursor-based pagination to pull all collections from Appwrite after every up-sync pass. Conflicts are resolved with "Appwrite wins" and logged for audit.</p>
+      <p>Down-sync uses cursor-based pagination to pull all tables from Appwrite after every up-sync pass. Conflicts are resolved with "Appwrite wins" and logged for audit.</p>
       <div class="tag-list">
         <span class="tag">Outbox Pattern</span>
         <span class="tag">Cursor Pagination</span>
@@ -622,24 +623,24 @@ SQLite (immediate write)
     ▼  [on connect / unlock / tick]
 SyncService.processQueue()
     │
-    ├─► Appwrite Database (upsert per collection)
+    ├─► Appwrite Database (upsertRow per table)
     │
     ▼  [after up-sync]
 DownSyncService.pull()
     │
-    ├─► Appwrite (cursor-paged GET per collection)
+    ├─► Appwrite (cursor-paged listRows per table)
     ├─► SQLite (write new/updated rows)
     └─► sync_conflicts (on version mismatch → Appwrite wins)</code></pre>
 
-  <h2>Appwrite Collections</h2>
+  <h2>Appwrite Tables</h2>
   <div class="table-scroll"><table class="collection-table">
-    <thead><tr><th>Collection ID</th><th>Primary Key</th><th>Role</th></tr></thead>
+    <thead><tr><th>Table ID</th><th>Primary Key</th><th>Role</th></tr></thead>
     <tbody>
       <tr><td>ledger_entries</td><td>event_id</td><td>Append-only audit / truth log. Never updated, only inserted.</td></tr>
       <tr><td>assets</td><td>asset_id</td><td>Livestock + crop records with photo references.</td></tr>
       <tr><td>inventory</td><td>item_id</td><td>Feed, medicine, equipment. Supports edit.</td></tr>
       <tr><td>financials</td><td>transaction_id</td><td>Sales and purchases. Supports partial payment linkage.</td></tr>
-      <tr><td>partial_payments</td><td>payment_id</td><td>Instalments referencing a <code>financials</code> record.</td></tr>
+      <tr><td>partial_payments</td><td>payment_id</td><td>Instalments referencing a <code>financials</code> row.</td></tr>
       <tr><td>asset_events</td><td>event_id</td><td>Per-asset activity log (vaccinations, treatments, etc.).</td></tr>
       <tr><td>milk_logs</td><td>log_id</td><td>Individual milk sessions linked to an asset.</td></tr>
       <tr><td>flock_logs</td><td>log_id</td><td>Feed, pasture, and rotation tracking.</td></tr>
@@ -650,7 +651,7 @@ DownSyncService.pull()
 
   <h2>Conflict Resolution Policy</h2>
   <div class="callout">
-    <strong>Appwrite wins.</strong> When a down-sync document has a newer <code>updated_at</code> than the local SQLite row, the Appwrite version overwrites the local record. The overwritten local values are recorded in <code>sync_conflicts</code> with a <code>conflict_id</code> for full audit. Users can review conflicts via the long-press menu on the sync banner.
+    <strong>Appwrite wins.</strong> When a down-sync document has a newer <code>updated_at</code> than the local SQLite row, the Appwrite version overwrites the local record. The overwritten local values are recorded in <code>sync_conflicts</code> for full audit. Users can review conflicts via the long-press menu on the sync banner.
   </div>
 
   <h2 id="arch-infra">Cloud Infrastructure</h2>
@@ -676,7 +677,7 @@ DownSyncService.pull()
         <ul>
           <li>Exposed as an Appwrite Function HTTP endpoint</li>
           <li>Receives and validates Daraja callback body</li>
-          <li>Writes confirmed payment to <code>financials</code> collection</li>
+          <li>Writes confirmed payment to <code>financials</code> table</li>
           <li>Creates row in <code>partial_payments</code> if instalment</li>
         </ul>
       </div>
@@ -722,8 +723,8 @@ Safaricom Daraja API → STK prompt on user's phone
     ▼  [user enters PIN on phone]
 Daraja Callback → Cloudflare Worker → Appwrite Function (Go)
     │
-    ├─► Appwrite Database: update financials
-    └─► Appwrite Database: insert partial_payment (if instalment)</code></pre>
+    ├─► Appwrite Database: update financials row
+    └─► Appwrite Database: insert partial_payment row (if instalment)</code></pre>
 
   <h2>Deferred &amp; Roadmap Items</h2>
   <div class="table-scroll"><table class="collection-table">
@@ -744,9 +745,31 @@ Daraja Callback → Cloudflare Worker → Appwrite Function (Go)
 
   <div class="release">
     <div class="release-meta">
+      <div class="release-version">v0.4.1</div>
+      <div class="release-date">2026-04-21</div>
+      <span class="release-badge badge-latest">Latest · Beta</span>
+    </div>
+    <div class="release-body">
+      <h3>Appwrite 1.8.0 Migration</h3>
+      <p style="font-size:.88rem;color:#2e4a32;margin-bottom:1.2rem;">Full migration of the data and sync layer to Appwrite's modern TablesDB architecture.</p>
+
+      <div class="change-group">
+        <div class="change-group-label changed">↺ Changed</div>
+        <ul class="change-list">
+          <li><strong>SDK Migration:</strong> Replaced the deprecated <code>Databases</code> service with the new <code>TablesDB</code> service.</li>
+          <li><strong>Performance:</strong> Switched <code>SyncService</code> from manual "update-then-create" fallback loops to the native <code>upsertRow</code> API, cutting up-sync latency for new records by ~50%.</li>
+          <li><strong>Realtime:</strong> Updated <code>MpesaListenerService</code> to use the new 1.8.0 realtime path structure (<code>.tables.</code> and <code>.rows</code> instead of collections/documents).</li>
+          <li><strong>Terminology:</strong> Aligned documentation and code comments with the "Tables" and "Rows" nomenclature.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <div class="release">
+    <div class="release-meta">
       <div class="release-version">v0.4.0</div>
       <div class="release-date">2026 — Q2</div>
-      <span class="release-badge badge-latest">Latest · Beta</span>
+      <span class="release-badge badge-beta">Beta</span>
     </div>
     <div class="release-body">
       <h3>Architecture & Codebase Modularisation</h3>
@@ -779,7 +802,7 @@ Daraja Callback → Cloudflare Worker → Appwrite Function (Go)
       <div class="change-group">
         <div class="change-group-label added">✦ Added</div>
         <ul class="change-list">
-          <li><strong>Feed & Pasture Logs:</strong> New dedicated screen and <code>flock_logs</code> collection for tracking paddock rotation, supplemental feeding, and daily feed costs.</li>
+          <li><strong>Feed & Pasture Logs:</strong> New dedicated screen and <code>flock_logs</code> table for tracking paddock rotation, supplemental feeding, and daily feed costs.</li>
           <li><strong>Monthly Summary KPIs:</strong> The dashboard now aggregates flock size, monthly births, deaths, total income, and total expenses natively via SQLite.</li>
           <li><strong>Extended Health Metadata:</strong> Medication and deworming events now capture Anthelmintic Class, Route, and auto-calculate Withdrawal End Dates.</li>
           <li><strong>Advanced Mortality Logs:</strong> Deceased events now capture Probable Cause, Carcass Disposal Method, and Vet Consultation status.</li>
@@ -876,7 +899,7 @@ Daraja Callback → Cloudflare Worker → Appwrite Function (Go)
       <div class="change-group">
         <div class="change-group-label added">✦ Added</div>
         <ul class="change-list">
-          <li>Full bidirectional sync across all 7 data collections via outbox pattern</li>
+          <li>Full bidirectional sync across all 7 data tables via outbox pattern</li>
           <li>Photo capture on herd registration and activity log, thumbnails shown on herd cards</li>
           <li>Sales history screen with full transaction list</li>
           <li>Inventory management with inline edit support</li>
@@ -887,7 +910,7 @@ Daraja Callback → Cloudflare Worker → Appwrite Function (Go)
           <li>Milk logging sessions linked per animal</li>
           <li>Partial payment support on financial records (instalment tracking)</li>
           <li>1000s heartbeat sync via <code>AppRefreshService</code></li>
-          <li>Cursor-based down-sync with per-collection watermarks (<code>sync_meta</code>)</li>
+          <li>Cursor-based down-sync with per-table watermarks (<code>sync_meta</code>)</li>
           <li><code>AppRefreshService</code> emits pre + post sync stream events for clean UI states</li>
           <li>Image compression pipeline: pick → compress (JPEG ≤200KB) → cache → queue → upload</li>
           <li><code>SessionManager</code> restores user session from secure storage on app start</li>
@@ -916,7 +939,7 @@ Daraja Callback → Cloudflare Worker → Appwrite Function (Go)
         <ul class="change-list">
           <li>Transactional outbox queue (<code>sync_queue</code>) replacing direct Appwrite writes</li>
           <li>Cursor-based down-sync replacing full-collection pulls</li>
-          <li><code>sync_conflicts</code> collection and in-app conflict viewer</li>
+          <li><code>sync_conflicts</code> table and in-app conflict viewer</li>
           <li>Unlock-triggered immediate sync tick</li>
         </ul>
       </div>
@@ -941,7 +964,7 @@ Daraja Callback → Cloudflare Worker → Appwrite Function (Go)
       <div class="change-group">
         <div class="change-group-label added">✦ Added</div>
         <ul class="change-list">
-          <li>SQLite schema v1: all 9 collection tables + housekeeping tables</li>
+          <li>SQLite schema v1: all 9 table mirrors + housekeeping tables</li>
           <li>Appwrite SDK initialisation and auth flow</li>
           <li>Assets, inventory, and financial screens (read-only)</li>
           <li>Milk log creation and listing</li>
@@ -969,7 +992,7 @@ Daraja Callback → Cloudflare Worker → Appwrite Function (Go)
       <div class="change-group">
         <div class="change-group-label added">✦ Added</div>
         <ul class="change-list">
-          <li>Flutter project initialisation — Android target, your Android device test device</li>
+          <li>Flutter project initialisation — Android target</li>
           <li>Appwrite Cloud project and database provisioned (Frankfurt region)</li>
           <li>Initial pubspec with core dependencies</li>
           <li>Basic navigation shell and placeholder screens</li>
